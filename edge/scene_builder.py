@@ -4,6 +4,7 @@ import logging
 from .camera_service import CameraService
 from .cv_inference import CVInference
 from .slot_engine import SlotEngine
+from .guidance_engine import GuidanceEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("scene-builder")
@@ -15,6 +16,7 @@ class SceneBuilder:
         self.camera = CameraService()
         self.inference = CVInference()
         self.engine = SlotEngine()
+        self.guidance_engine = GuidanceEngine()
         self.camera.start()
         logger.info("Initializing Scene Builder...")
 
@@ -28,11 +30,19 @@ class SceneBuilder:
         possible_hazards = ["Oil Leak", "Unauthorized Access", "Double Parked", "Blocked Fire Hydrant"]
         hazards = random.choices(possible_hazards, k=random.randint(0, 1)) if random.random() > 0.8 else []
         
+        # Calculate Guidance
+        target_slot = occupancy[0] if occupancy else None
+        guidance = {}
+        if target_slot:
+            center_x = (target_slot.get('id', 0) * 10) + 5
+            guidance = self.guidance_engine.calculate_maneuver((center_x, 35))
+        
         scene = {
             "camera_id": frame["camera_id"],
             "timestamp": frame["timestamp"],
             "slots": occupancy,
             "hazards": hazards,
+            "guidance": guidance,
             "confidence": 0.95 # Mock aggregate confidence
         }
         

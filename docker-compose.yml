@@ -1,13 +1,29 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=parksight
+      - POSTGRES_PASSWORD=parksight
+      - POSTGRES_DB=parksight_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - parksight-net
+
   api:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     environment:
+      - DATABASE_URL=postgresql://parksight:parksight@db:5432/parksight_db
       - GROQ_API_KEY=${GROQ_API_KEY:-}
     volumes:
       - parksight-telemetry:/app/telemetry
@@ -40,10 +56,9 @@ services:
       - parksight-net
 
 volumes:
+  postgres_data:
   parksight-telemetry:
-    driver: local
   parksight-models:
-    driver: local
 
 networks:
   parksight-net:

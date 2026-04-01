@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from .policy_engine import PolicyEngine
 from .telemetry import TelemetrySystem
+from .reports import ReportGenerator
 from langgraph.graph import StateGraph
 
 # Load environment variables (GROQ_API_KEY, etc.)
@@ -95,6 +96,12 @@ async def process_scene(scene: Scene):
 @app.get("/telemetry/summary")
 def get_summary():
     return telemetry.get_summary()
+
+@app.get("/reports/generate")
+def generate_report():
+    """Generates a utilization report from telemetry history."""
+    report_gen = ReportGenerator(telemetry.history)
+    return report_gen.generate_utilization_report()
 
 if __name__ == "__main__":
     import uvicorn

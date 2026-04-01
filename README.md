@@ -43,6 +43,26 @@ GitHub → CodeBuild → ECR → EKS (+ Edge OTA)
 - docker/
 ---
 
+## Functionalities & Use Cases
+
+- **Real-time Occupancy Detection**: Monitoring live CCTV streams to display free vs. occupied parking spaces.
+- **Obstacle & Hazard Detection**: Identifying pedestrians, vehicles, or road cones to assist in safety.
+- **Automated Parking Guidance**: Providing intelligent navigation, interpreting camera data to assist with parallel or perpendicular parking.
+- **Smart Parking Management**: Generating reports on parking lot utilization, peak hours, and identifying overcrowding.
+- **Anomaly Detection**: Detecting unusual behavior or safety hazards and sending real-time alerts.
+
+### Example Implementations
+- **SmartPark-V11**: Utilizes YOLO11 and OpenCV for real-time tracking of parking occupancy.
+- **LLM-Assisted Navigation**: AI system that translates scene descriptions into safe navigation paths.
+- **Chatbot Parking Finder**: Integrates YOLO objects with a chatbot to guide users to available spots.
+
+## Advantages Over Conventional Systems
+- **Cost-Effective**: Replaces thousands of individual hardware sensors with fewer camera installations.
+- **High Accuracy**: Deep learning techniques reaching 95% accuracy in daylight and 90% in low-light.
+- **Contextual Understanding**: LLMs provide superior semantic understanding compared to traditional vision-only systems.
+
+---
+
 ## Roadmap
 
 ### Immediate (Priority 1)

@@ -14,13 +14,10 @@ else
 fi
 
 # 2. Activate & Install
-echo "🔌 Activating virtual environment..."
-source .venv/bin/activate
-
 echo "⬆️ Upgrading pip..."
-pip install --upgrade pip
+./.venv/bin/python3 -m pip install --upgrade pip
 
 echo "🛠️ Installing dependencies from requirements.txt..."
-pip install -r requirements.txt
+./.venv/bin/pip install -r requirements.txt
 
 echo "✨ Environment Ready! To activate, run: source .venv/bin/activate"

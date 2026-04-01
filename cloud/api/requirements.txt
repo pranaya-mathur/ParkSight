@@ -7,3 +7,5 @@ langchain-groq
 python-dotenv
 requests
 shapely
+sqlalchemy
+psycopg2-binary

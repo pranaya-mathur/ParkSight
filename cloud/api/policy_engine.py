@@ -38,13 +38,34 @@ class PolicyEngine:
                 })
         
         # Check slots for rule compliance
-        for slot in scene["slots"]:
+        occupied_count = sum(1 for s in scene["slots"] if s["status"] == "occupied")
+        
+        # 1. Overcrowding Detection (e.g. > 80% capacity)
+        if occupied_count / len(scene["slots"]) > 0.8:
+            violations.append({
+                "type": "Usage Anomaly",
+                "description": "Parking lot is reaching critical capacity (Overcrowding).",
+                "severity": "Medium"
+            })
+            
+        for i, slot in enumerate(scene["slots"]):
             slot_id = slot["id"]
             status = slot["status"]
             
             if status == "occupied":
-                # In a real system, we'd check vehicle type/permit
-                # Here we just mock the rule check
+                # 2. Potential Double Parking Detection
+                # (If two adjacent slots are occupied by the same 'large' vehicle detection)
+                # For this mock, we simulate it based on a random factor.
+                import random
+                if random.random() > 0.95:
+                    violations.append({
+                        "type": "Policy Violation",
+                        "slot_id": slot_id,
+                        "rule": "Single Slot Usage",
+                        "description": "Possible Double Parking detected.",
+                        "severity": "High"
+                    })
+                
                 rule = self.rules.get(slot_id, "Standard")
                 if rule != "Standard":
                     # Simulate a 10% chance of a violation for demo purposes

@@ -1,47 +1,59 @@
-import datetime
 import logging
+import json
+import datetime
+import os
+from sqlalchemy import create_all, create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("telemetry")
+Base = declarative_base()
+
+class TelemetryEvent(Base):
+    __tablename__ = 'telemetry_events'
+    id = Column(Integer, primary_key=True)
+    event_type = Column(String(50))
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    data = Column(Text) # JSON string
 
 class TelemetrySystem:
-    """Telemetry system for logging and monitoring parking lot activity."""
+    """Enterprise-grade telemetry system with PostgreSQL persistence."""
     
     def __init__(self):
-        # In a real system, this would push to a time-series database (e.g., InfluxDB, Prometheus)
-        self.history = []
-        logger.info("Initialized Telemetry System.")
+        self.db_url = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+        self.engine = create_engine(self.db_url)
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
+        self.history = [] # Keep in-memory cache for quick reports
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger("telemetry")
 
     def log_event(self, event_type: str, data: dict):
-        """Logs an event to the telemetry history."""
-        timestamp = datetime.datetime.utcnow().isoformat()
-        entry = {
-            "timestamp": timestamp,
-            "type": event_type,
-            "data": data
-        }
-        self.history.append(entry)
-        
-        # Limit history to 100 entries for this mock
-        if len(self.history) > 100:
-            self.history.pop(0)
+        """Persists a telemetry event to the database."""
+        try:
+            session = self.Session()
+            event = TelemetryEvent(
+                event_type=event_type,
+                data=json.dumps(data)
+            )
+            session.add(event)
+            session.commit()
+            session.close()
             
-        logger.debug(f"Logged {event_type} event.")
-        return entry
+            # Cache locally
+            self.history.append({
+                "type": event_type,
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "data": data
+            })
+            self.logger.info(f"📊 Event Logged: {event_type} (DB Persisted)")
+        except Exception as e:
+            self.logger.error(f"❌ Failed to persist telemetry: {e}")
 
     def get_summary(self):
-        """Returns a summary of the telemetry history."""
-        if not self.history:
-            return {"status": "inactive"}
-            
-        latest = self.history[-1]
-        return {
-            "total_events": len(self.history),
-            "latest_event_type": latest["type"],
-            "latest_timestamp": latest["timestamp"]
-        }
+        """Returns the last 50 events."""
+        return self.history[-50:]
 
 if __name__ == "__main__":
     ts = TelemetrySystem()
-    ts.log_event("Heartbeat", {"camera_id": "CAM-01"})
+    ts.log_event("Test", {"status": "ok"})
     print(ts.get_summary())

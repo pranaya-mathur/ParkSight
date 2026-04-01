@@ -112,18 +112,64 @@ const App = () => {
 
       {/* Main Dashboard Grid */}
       <main>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="glass p-6 text-center">
+            <h3 className="text-slate-400 text-sm mb-2 uppercase tracking-wider">Utilization</h3>
+            <p className="text-3xl font-bold text-primary">40%</p>
+          </div>
+          <div className="glass p-6 text-center">
+            <h3 className="text-slate-400 text-sm mb-2 uppercase tracking-wider">Peak Hour Status</h3>
+            <p className="text-3xl font-bold text-emerald-400">OPTIMAL</p>
+          </div>
+          <div className="glass p-6 text-center">
+            <h3 className="text-slate-400 text-sm mb-2 uppercase tracking-wider">Alerts (24h)</h3>
+            <p className="text-3xl font-bold text-rose-400">2</p>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-6">
           <h2 className="flex items-center gap-2">
             <MapPin size={20} className="text-slate-400" />
-            Live Slot Monitor
+            Live Map & Guidance
           </h2>
-          <div className="flex gap-4">
-            <span className="flex items-center text-sm gap-1">
-              <span className="status-indicator status-free"></span> 10 Free
+          <div className="flex gap-2">
+            <span className="px-3 py-1 glass text-xs rounded-full border border-emerald-500/30 text-emerald-400">
+              ● All Slots Active
             </span>
-            <span className="flex items-center text-sm gap-1">
-              <span className="status-indicator status-occupied"></span> 0 Occupied
-            </span>
+          </div>
+        </div>
+
+        {/* 3D-Like Parking Map with Guidance Overlay */}
+        <div className="relative glass h-[400px] mb-8 overflow-hidden rounded-2xl group">
+          <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center">
+            {/* Simulated Grid Slots */}
+            <div className="flex gap-4 p-8 items-end h-full w-full justify-around">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
+                <div key={i} className={`w-16 h-32 rounded-lg border-2 border-dashed transition-all duration-500 
+                  ${i === 0 ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}>
+                  <div className="text-[10px] text-slate-500 text-center mt-2 uppercase">SLOT {i}</div>
+                </div>
+              ))}
+            </div>
+            
+            {/* AR Guidance Path Overlay */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none">
+              <defs>
+                <linearGradient id="guidanceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.1" />
+                </linearGradient>
+              </defs>
+              <path d="M 500,400 Q 400,300 50,150" fill="none" stroke="url(#guidanceGradient)" strokeWidth="8" strokeLinecap="round" className="animate-pulse" />
+              <circle cx="50" cy="150" r="10" fill="#10b981" className="animate-ping" />
+            </svg>
+
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 glass px-6 py-3 border-emerald-500/50">
+              <p className="text-emerald-400 font-medium flex items-center gap-3">
+                <ChevronRight size={18} />
+                GUIDANCE: TURN LEFT 45° INTO SLOT 0
+              </p>
+            </div>
           </div>
         </div>
 
