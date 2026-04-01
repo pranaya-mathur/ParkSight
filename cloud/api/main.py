@@ -106,20 +106,29 @@ async def process_scene(scene: Scene):
     }
 
 @app.get("/telemetry/summary")
-def get_summary():
-    return telemetry.get_summary()
+def get_summary(camera_id: Optional[str] = None):
+    return telemetry.get_history(camera_id=camera_id, limit=50)
 
 @app.get("/reports/generate")
-def generate_report():
-    """Generates a utilization report from telemetry history."""
-    report_gen = ReportGenerator(telemetry.history)
+def generate_report(camera_id: Optional[str] = None):
+    """Generates a utilization report from database history."""
+    history = telemetry.get_history(camera_id=camera_id, limit=1000)
+    report_gen = ReportGenerator(history)
     return report_gen.generate_utilization_report()
 
 @app.get("/analytics/heatmap")
-def get_heatmap():
-    """Generates an occupancy heatmap from telemetry history."""
-    analyzer = AnalyticsService(telemetry.history)
+def get_heatmap(camera_id: Optional[str] = None):
+    """Generates an occupancy heatmap from database history."""
+    history = telemetry.get_history(camera_id=camera_id, limit=500)
+    analyzer = AnalyticsService(history)
     return analyzer.get_occupancy_heatmap()
+
+@app.get("/analytics/violations")
+def get_violations(camera_id: Optional[str] = None):
+    """Generates a violation report from database history."""
+    history = telemetry.get_history(camera_id=camera_id, limit=500)
+    analyzer = AnalyticsService(history)
+    return analyzer.get_violation_report()
 
 if __name__ == "__main__":
     import uvicorn

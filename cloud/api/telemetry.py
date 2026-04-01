@@ -2,7 +2,7 @@ import logging
 import json
 import datetime
 import os
-from sqlalchemy import create_all, create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -16,14 +16,13 @@ class TelemetryEvent(Base):
     data = Column(Text) # JSON string
 
 class TelemetrySystem:
-    """Enterprise-grade telemetry system with PostgreSQL persistence."""
+    """Enterprise-grade telemetry system with SQLAlchemy persistence."""
     
     def __init__(self):
-        self.db_url = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+        self.db_url = os.getenv("DATABASE_URL", "sqlite:///./parksight.db")
         self.engine = create_engine(self.db_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
-        self.history = [] # Keep in-memory cache for quick reports
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger("telemetry")
 
@@ -38,22 +37,39 @@ class TelemetrySystem:
             session.add(event)
             session.commit()
             session.close()
-            
-            # Cache locally
-            self.history.append({
-                "type": event_type,
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "data": data
-            })
             self.logger.info(f"📊 Event Logged: {event_type} (DB Persisted)")
         except Exception as e:
             self.logger.error(f"❌ Failed to persist telemetry: {e}")
 
+    def get_history(self, camera_id: str = None, limit: int = 100):
+        """Fetches telemetry history from DB, with optional filtering by camera."""
+        session = self.Session()
+        query = session.query(TelemetryEvent).order_by(TelemetryEvent.timestamp.desc())
+        
+        results = []
+        for event in query.all():
+            event_data = json.loads(event.data)
+            # Filter by camera_id if provided
+            if camera_id and event_data.get("camera_id") != camera_id:
+                continue
+            
+            results.append({
+                "type": event.event_type,
+                "timestamp": event.timestamp.isoformat(),
+                "data": event_data
+            })
+            if len(results) >= limit:
+                break
+                
+        session.close()
+        return results
+
     def get_summary(self):
         """Returns the last 50 events."""
-        return self.history[-50:]
+        return self.get_history(limit=50)
 
 if __name__ == "__main__":
     ts = TelemetrySystem()
-    ts.log_event("Test", {"status": "ok"})
+    ts.log_event("Scene Update", {"camera_id": "CAM-01", "status": "ok"})
+    print(f"Total events for CAM-01: {len(ts.get_history(camera_id='CAM-01'))}")
     print(ts.get_summary())

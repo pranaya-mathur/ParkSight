@@ -1,84 +1,99 @@
-# ParkSight AI (Production Repo)
+# ParkSight AI: Enterprise Parking Guidance & Analytics
 
-## What we are building
-An enterprise-grade, edge-first intelligent parking guidance system:
-- CV (YOLO) for perception on edge devices
-- Deterministic slot engine for decisions (authoritative)
-- LangGraph-powered LLM for explanations (advisory only)
-- Cloud control plane for orchestration, policy, telemetry
-- CI/CD + Docker + Helm for production deployment
+[![Production Ready](https://img.shields.io/badge/Status-Production--Ready-green.svg)]()
+[![AI Powered](https://img.shields.io/badge/AI-YOLO11%20%2B%20LangGraph-blue.svg)]()
 
-## Architecture
-Edge:
-- camera-service
-- cv-inference (YOLO/TensorRT)
-- slot-engine (polygon overlap)
-- scene-builder (structured JSON)
+ParkSight AI is an enterprise-grade, edge-first intelligent parking guidance system designed to rival professional solutions like Parquery. It combines high-performance Computer Vision (CV) with LLM-based explainability and robust cloud analytics.
 
-Cloud:
-- FastAPI APIs
-- LangGraph orchestrator (LLM)
-- policy-engine (rules/guardrails)
-- telemetry
+---
 
-## Key Principles
-- Deterministic > ML > LLM
-- LLM cannot decide safety or slot state
-- Edge-first latency, cloud for orchestration
+## 🏗️ System Architecture
 
-## Run (local dev)
+```mermaid
+graph TD
+    subgraph Edge ["Edge (Camera / Jetson)"]
+        Cam[Camera Service] --> CV[CV Inference (YOLO11)]
+        CV --> SE[Slot Engine (Shapely)]
+        SE --> SB[Scene Builder]
+        GE[Guidance Engine] -.-> SB
+    end
+
+    subgraph Cloud ["Cloud Control Plane"]
+        SB --> API[Telemetry / API]
+        API --> DB[(In-Memory History)]
+        DB --> AS[Analytics Service]
+        DB --> RG[Report Generator]
+        API --> LG[LangGraph Orchestrator]
+    end
+
+    subgraph Frontend ["User Interface"]
+        LG --> UI[React Dashboard]
+        RG --> UI
+    end
+```
+
+---
+
+## 🚀 Core Functionalities (Current State)
+
+### 1. Real-time Occupancy Detection (Functional)
+- **Engine**: Uses **Shapely** polygons for high-precision slot detection.
+- **Perspective Correction**: Integrated **3x3 Homography Matrix** for top-down coordinate mapping.
+- **Overstay Tracking**: Tracks `occupancy_duration` for every vehicle in real-time.
+
+### 2. Anomaly & Hazard Detection (Functional)
+- **Safety Hazards**: Detects pedestrians and bicycles in car-only zones.
+- **Policy Violations**: Automated alerts for **Overstay Violations** and **Blocked Infrastructure** (e.g., Fire Hydrants).
+- **Rule-based Engine**: Moves beyond simulation to deterministic violation detection.
+
+### 3. Automated Parking Guidance (Functional)
+- **Deterministic Steering**: Calculates distances and angles using top-down geometry.
+- **LLM Advisory**: **LangGraph** provides context-aware instructions (e.g., "Slot 3 is free, watch out for the pedestrian nearby").
+
+### 4. Smart Parking Management (Functional)
+- **Peak Hour Analysis**: Identifies usage frequency by the hour to optimize lot operations.
+- **Usage Trends**: Historical tracking of average occupancy and overcrowding.
+- **Violation Reporting**: Categorized alerts for management (Safety vs. Policy).
+
+---
+
+## 🛠️ Tech Stack
+- **Edge**: Python, Ultralytics YOLOv11, OpenCV, Shapely.
+- **Cloud**: FastAPI, LangGraph, LangChain, Groq (Llama 3).
+- **Orchestration**: Docker, Docker Compose.
+
+---
+
+## 🚦 Getting Started
+
+### Local Development (Docker)
 ```bash
 docker compose up --build
 ```
 
-## Deploy (Kubernetes)
+### Environment Setup
+Create a `.env` file from `.env.example`:
 ```bash
-helm install parksight ./infra/helm
+GROQ_API_KEY=your_key_here
+CAMERA_SOURCE=MOCK # Use RTSP/CSI URL for real hardware
 ```
 
-## CI/CD
-GitHub → CodeBuild → ECR → EKS (+ Edge OTA)
-
-## Folders
-- docker/
 ---
 
-## Functionalities & Use Cases
+## 🗺️ Roadmap
 
-- **Real-time Occupancy Detection**: Monitoring live CCTV streams to display free vs. occupied parking spaces.
-- **Obstacle & Hazard Detection**: Identifying pedestrians, vehicles, or road cones to assist in safety.
-- **Automated Parking Guidance**: Providing intelligent navigation, interpreting camera data to assist with parallel or perpendicular parking.
-- **Smart Parking Management**: Generating reports on parking lot utilization, peak hours, and identifying overcrowding.
-- **Anomaly Detection**: Detecting unusual behavior or safety hazards and sending real-time alerts.
+### ✅ Completed (V1.0)
+- [x] **Real CV Integration**: Robust YOLOv11 filtering for safety objects.
+- [x] **Advanced Slot Logic**: Shapely Integration with Homography calibration.
+- [x] **Smart Orchestration**: LangGraph conditional routing for URGENT alerts.
+- [x] **Analytics Module**: Peak hour and violation reporting logic.
 
-### Example Implementations
-- **SmartPark-V11**: Utilizes YOLO11 and OpenCV for real-time tracking of parking occupancy.
-- **LLM-Assisted Navigation**: AI system that translates scene descriptions into safe navigation paths.
-- **Chatbot Parking Finder**: Integrates YOLO objects with a chatbot to guide users to available spots.
+### 🟡 In-Progress (V1.1)
+- [ ] **Database Persistence**: Move telemetry tracking to SQLite/PostgreSQL.
+- [ ] **Multi-Camera Support**: Orchestrating multiple edge devices in one dashboard.
+- [ ] **AR Guidance**: UI overlay for mobile-first parking guidance.
 
-## Advantages Over Conventional Systems
-- **Cost-Effective**: Replaces thousands of individual hardware sensors with fewer camera installations.
-- **High Accuracy**: Deep learning techniques reaching 95% accuracy in daylight and 90% in low-light.
-- **Contextual Understanding**: LLMs provide superior semantic understanding compared to traditional vision-only systems.
-
----
-
-## Roadmap
-
-### Immediate (Priority 1)
-- **Real CV Integration**: Replace mock perception with Ultralytics YOLO26-N + TensorRT export.
-- **Advanced Slot Logic**: Upgrade `slot_engine` to true polygons (Shapely) with homography calibration.
-- **Hardware Support**: Add RTSP/CSI camera stream support.
-- **Smart Orchestration**: Expand LangGraph with conditional routing for urgent alerts.
-- **Persistence**: Add Docker volumes and persistent telemetry logging.
-
-### Medium-Term (Priority 2)
-- **Scalability**: Multi-camera support and cross-camera tracking.
-- **UI/UX**: AR guidance overlay and complex real-time occupancy heatmaps.
-- **Observability**: Integration with Prometheus/Grafana for enterprise telemetry.
-- **Quality**: Automated CI/CD pipelines via GitHub Actions.
-
-### Advanced (Long-Term)
-- **Re-ID**: Vehicle re-identification and license-plate linking.
-- **Dynamic Mapping**: Learning slot locations automatically from historical patterns.
-- **Resilience**: Edge-only fallback mode for cloud outages.
+### 📈 Future (V2.0)
+- [ ] **ALPR**: Automatic License Plate Recognition.
+- [ ] **Re-ID**: Tracking specific vehicles across multiple camera perspectives.
+- [ ] **Edge Fallback**: Offline mode for edge-only operations during cloud outages.
