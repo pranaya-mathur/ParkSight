@@ -18,11 +18,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const App = () => {
   const [view, setView] = useState('live');
-  const [selectedCamera, setSelectedCamera] = useState('CAM-01');
+  const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState({ slots: [], hazards: [], summary: {} });
   const [stats, setStats] = useState(null);
   const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter slots based on search query
+  const filteredSlots = data.slots?.filter(slot => 
+    !searchQuery || 
+    slot.license_plate?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    slot.vehicle_id?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Fetch all data for the selected camera
   useEffect(() => {
@@ -68,7 +75,7 @@ const App = () => {
       <aside className="sidebar">
         <div className="flex items-center gap-3 px-2 mb-4">
           <ShieldAlert className="text-primary" size={32} />
-          <h1 className="text-xl">ParkSight <span className="text-sm font-normal opacity-50">v1.1</span></h1>
+          <h1 className="text-xl">ParkSight <span className="text-sm font-normal opacity-50">v2.0</span></h1>
         </div>
 
         <nav className="flex-1">
@@ -85,9 +92,22 @@ const App = () => {
       {/* Main Content Area */}
       <main className="main-content">
         <header className="flex justify-between items-center mb-10">
-          <div>
-            <h2 className="text-2xl font-bold">{view === 'live' ? 'Real-time Guidance' : view.toUpperCase()}</h2>
-            <p className="text-slate italic">Precision occupancy & safety orchestration</p>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold">{view === 'live' ? 'Identity Control' : view.toUpperCase()}</h2>
+            <div className="flex items-center gap-4 mt-1">
+               <p className="text-slate italic">AI-driven license plate & identity orchestration</p>
+               {view === 'live' && (
+                 <div className="relative group">
+                   <input 
+                     type="text" 
+                     placeholder="Search Plate / ID..." 
+                     value={searchQuery}
+                     onChange={(e) => setSearchQuery(e.target.value)}
+                     className="bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-1 text-xs focus:border-primary outline-none transition-all w-48"
+                   />
+                 </div>
+               )}
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -103,10 +123,6 @@ const App = () => {
                   {cam}
                 </button>
               ))}
-            </div>
-            <div className="glass px-4 py-2 flex items-center gap-3 border-emerald-500/20">
-              <div className="status-indicator status-active" />
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-tighter">System Health: Optimal</span>
             </div>
           </div>
         </header>
@@ -140,42 +156,68 @@ const App = () => {
 
               {/* Live Grid */}
               <div className="dashboard-grid">
-                {data.slots?.map(slot => (
-                  <div key={slot.id} className={`glass glass-hover slot-card ${slot.id === data.guidance?.best_slot ? 'glass-active' : ''}`}>
-                    <div className="flex justify-between items-center mb-2">
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slot #{slot.id}</span>
-                       <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                         slot.status === 'occupied' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent'
-                       }`}>
-                         {slot.status}
-                       </div>
-                    </div>
-                    
-                    <div className="slot-visual">
-                      {slot.status === 'occupied' && (
-                        <>
-                          <div className="duration-badge"><Timer size={10} className="inline mr-1" /> {Math.round(slot.occupancy_duration)}s</div>
-                          <Car className="text-white/20" size={64} />
-                        </>
-                      )}
-                      {slot.id === data.guidance?.best_slot && slot.status === 'free' && (
-                        <motion.div 
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                          className="text-primary flex flex-col items-center gap-1"
-                        >
-                          <CheckCircle2 size={32} />
-                          <span className="text-[10px] font-bold">RECOMMENDED</span>
-                        </motion.div>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-between text-[10px] font-bold text-slate-600 mt-2">
-                      <span>DIST: {slot.distance}m</span>
-                      <span>PERSPECTIVE: VALID</span>
-                    </div>
+                {filteredSlots?.length === 0 ? (
+                  <div className="col-span-full py-20 text-center glass opacity-50">
+                    <p className="italic">No vehicles matching "{searchQuery}" found on this camera.</p>
                   </div>
-                ))}
+                ) : (
+                  filteredSlots?.map(slot => (
+                    <div key={slot.id} className={`glass glass-hover slot-card ${slot.id === data.guidance?.best_slot ? 'glass-active' : ''}`}>
+                      <div className="flex justify-between items-center mb-2">
+                         <div className="flex flex-col">
+                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slot #{slot.id}</span>
+                           {slot.vehicle_id && (
+                             <motion.span 
+                               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                               className="text-[9px] text-primary font-mono font-bold"
+                             >
+                               {slot.vehicle_id}
+                             </motion.span>
+                           )}
+                         </div>
+                         <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                           slot.status === 'occupied' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent'
+                         }`}>
+                           {slot.status}
+                         </div>
+                      </div>
+                      
+                      <div className="slot-visual relative overflow-hidden">
+                        {slot.status === 'occupied' && (
+                          <>
+                            <div className="duration-badge"><Timer size={10} className="inline mr-1" /> {Math.round(slot.occupancy_duration)}s</div>
+                            <Car className="text-white/10" size={64} />
+                            
+                            {/* License Plate Tag */}
+                            {slot.license_plate && (
+                              <motion.div 
+                                initial={{ y: 20 }} animate={{ y: 0 }}
+                                className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white text-black px-2 py-0.5 rounded border-b-2 border-slate-400 shadow-xl"
+                              >
+                                <span className="text-[10px] font-black tracking-tight">{slot.license_plate}</span>
+                              </motion.div>
+                            )}
+                          </>
+                        )}
+                        {slot.id === data.guidance?.best_slot && slot.status === 'free' && (
+                          <motion.div 
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ repeat: Infinity, duration: 2 }}
+                            className="text-primary flex flex-col items-center gap-1"
+                          >
+                            <CheckCircle2 size={32} />
+                            <span className="text-[10px] font-bold">RECOMMENDED</span>
+                          </motion.div>
+                        )}
+                      </div>
+                      
+                      <div className="flex justify-between text-[10px] font-bold text-slate-600 mt-2">
+                        <span>DIST: {slot.distance}m</span>
+                        <span>IDENTITY: {slot.license_plate ? 'VERIFIED' : 'SCANNING'}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </motion.div>
           )}
