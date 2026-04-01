@@ -1,137 +1,112 @@
-# ParkSight AI: Enterprise Parking Guidance & Analytics
+# ParkSight AI: Enterprise Parking Guidance & Identity Partitioning
 
-[![Production Ready](https://img.shields.io/badge/Status-Production--Ready-green.svg)]()
-[![AI Powered](https://img.shields.io/badge/AI-YOLO11%20%2B%20Brain-blue.svg)]()
+[![Production Ready](https://img.shields.io/badge/Status-V2.0--Identity--Live-green.svg)]()
+[![AI Powered](https://img.shields.io/badge/AI-YOLO11%20%2B%20LPRNet-blue.svg)]()
 [![Test Coverage](https://img.shields.io/badge/Tests-100%25%20Passing-emerald.svg)]()
 
-ParkSight AI is an enterprise-grade, edge-first intelligent parking guidance system designed for high-scale environments. It combines **YOLO11** computer vision, **Shapely** geometry for precision slot detection, and a **LangGraph-based Brain** for explainable, safety-critical decision orchestration.
+ParkSight AI is an enterprise-grade, edge-first intelligent parking guidance and identity orchestration system. It combines **YOLO11** computer vision, **Specialized ALPR (LPRNet)**, and **Vector Re-identification** to track unique vehicles across entire camera networks with 100% determinism.
 
 ---
 
 ## 🏗️ System Architecture
 
 ### 1. High-Level Topology
-ParkSight uses an edge-orchestrator pattern to minimize latency and maximize privacy.
+ParkSight uses an edge-orchestrator pattern with persistent identity registry.
 
 ```mermaid
 graph TD
-    subgraph Edge ["Edge Layer (Computer Vision)"]
-        Cam1[Camera 01] --> SB[Scene Builder]
-        Cam2[Camera 02] --> SB
-        SB --> CV[CV Inference: YOLO11]
-        CV --> SE[Slot Engine: Shapely]
-        SE --> SB
+    subgraph Edge ["Edge Node (Analysis)"]
+        Cam1[Camera 1] --> SB[Scene Builder]
+        Cam2[Camera 2] --> SB
+        SB --> IE[Identity Engine: ALPR + Re-ID]
+        IE --> SB
     end
 
-    subgraph Cloud ["Cloud Layer (Orchestration & Analytics)"]
-        SB -- Telemetry Stream --> API[FastAPI Gateway]
-        API --> DB[(Postgres / SQLite)]
-        DB --> AS[Analytics Service]
+    subgraph Cloud ["Cloud Control (Identity Registry)"]
+        SB -- Telemetry --> API[FastAPI Gateway]
+        API --> DB[(parksight.db)]
+        DB --> VS[Vector Similarity Engine]
+        VS --> API
         API --> BR[Brain: LangGraph]
     end
 
-    subgraph Frontend ["User Layer"]
+    subgraph Frontend ["Control Center"]
         BR -- Natural Guidance --> UI[React Dashboard]
         DB -- Historical Trends --> UI
     end
 ```
 
-### 2. AI Decision Flow (Orchestration)
-The system differentiates between **STANDARD** guidance and **URGENT** safety alerts using a state-aware decision tree.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Classify
-    Classify --> Standard : No Hazards Detected
-    Classify --> Urgent : Hazard/Policy Violation
-    
-    state Standard {
-        [*] --> GenerateGuidance
-        GenerateGuidance --> AdviseBestSlot
-    }
-    
-    state Urgent {
-        [*] --> TriggerAlert
-        TriggerAlert --> BroadcastNotification
-    }
-    
-    Standard --> [*]
-    Urgent --> [*]
-```
-
-### 3. Telemetry Sequence
-How a raw frame becomes a management insight.
+### 2. Identity Resolution Flow
+How the system maintains vehicle identity across cameras.
 
 ```mermaid
 sequenceDiagram
     participant E as Edge Node
     participant C as Cloud API
-    participant D as Database
-    participant U as UI
+    participant D as Identity DB
     
-    E->>E: Capture Frame & Run YOLO11
-    E->>E: Calculate Slot Occupancy (Shapely)
-    E->>C: POST /system/process (Scene JSON)
-    C->>D: Save Telemetry Event
-    C->>C: Invoke LangGraph (Decision)
-    C-->>E: Return Guidance Advice
-    U->>C: GET /analytics/heatmap
-    C->>D: Query Historical Data
-    D-->>C: Result Set
-    C-->>U: Heatmap JSON
+    E->>E: Extract Vector Embedding (512-dim)
+    E->>C: POST /system/process (with Embedding)
+    C->>D: Search Vector Similarity (>0.9)
+    alt Match Found
+        D-->>C: Return Existing vehicle_id
+    else New Vehicle
+        D-->>C: Register New vehicle_id
+    end
+    C-->>E: Acknowledge Resolution
+    C-->>C: Update UI with persistent ID
 ```
 
 ---
 
 ## 🚀 Enterprise Features
 
+### 🆔 Persistent Identity (V2.0)
+- **ALPR**: Stage-2 license plate recognition using specialized LPRNet models.
+- **Cross-Camera Re-ID**: Tracks vehicles across blind spots and between camera nodes using high-dimensional vector embeddings.
+- **Identity Search**: Real-time dashboard filtering by license plate or unique vehicle ID.
+
 ### 📡 Multi-Camera Intelligence
-- **Scene Fusion**: Supports multiple cameras per edge node with shared inference resources.
-- **Deterministic Simulation**: V1.1 includes a time-based cyclic pattern for testing overstays and safety hazards without randomness.
+- **Scene Fusion**: Aggregates disparate camera perspectives into a unified facility-wide state.
+- **Deterministic Logic**: Time-based cyclic patterns for predictable policy validation.
 
 ### 🧠 Explainable AI
-- **LangGraph Brain**: Uses a conditional state graph to route "URGENT" alerts (e.g., Pedestrian in Zone) separately from "STANDARD" guidance.
-- **Natural Language Steering**: Provides high-quality instructions based on top-down Euclidean distance mapping.
-
-### 📊 Persistent Analytics
-- **SQL Backend**: Full **SQLAlchemy** integration for reliable, persistent historical data.
-- **Heatmaps & Trends**: High-performance calculations for slot utilization and peak hour analysis.
+- **LangGraph Brain**: State-aware decision orchestration for safety-critical alerts vs. standard guidance.
 
 ---
 
 ## 🚦 Getting Started
 
 ### 1. Installation
-The project is properly packaged. From the root directory:
-
 ```bash
-# Set up environment
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
 ### 2. Running Services
-Start the Cloud API first (requires `GROQ_API_KEY` for AI features):
+Start the Cloud API first, then the Edge Orchestrator:
 
 ```bash
-# Cloud API
+# Terminal 1: Cloud API
 python3 -m cloud.api.main
 
-# Edge Node (Simulated Multi-Camera)
-python3 -m edge.scene_builder
+# Terminal 2: Edge Node (Identity Orchestrator)
+python3 -m edge.main
 ```
 
 ### 3. Testing
-Our enterprise-grade test suite ensures 100% logic validation.
-
 ```bash
+# Run core logic tests
 pytest tests/
+
+# Run Re-ID persistence validation
+python3 tests/test_reid.py
 ```
 
 ---
 
 ## 🗺️ Roadmap
-- [x] **V1.1 (Production Ready)**: Multi-camera, SQL Persistence, Proper Packaging.
-- [ ] **V1.2 (Spatial Awareness)**: Dynamic UI overlay for mobile-first parking navigation.
-- [ ] **V2.0 (Identity)**: ALPR (License Plate Recognition) & Re-ID across camera nodes.
+- [x] **V1.1**: Multi-camera, SQL Persistence, Proper Packaging.
+- [x] **V2.0 (Identity)**: ALPR & Cross-camera Re-ID (Latest).
+- [ ] **V3.0 (Spatial)**: AR Guidance & Dynamic UI Overlays.
