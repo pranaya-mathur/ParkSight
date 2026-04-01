@@ -1,6 +1,6 @@
 # ParkSight AI: Enterprise Parking Monetization & Cognitive Guidance
 
-![ParkSight AI Dashboard Mockup](file:///Users/mobcoderid-296/Downloads/parksight-ai-full/assets/hero_dashboard.png)
+![ParkSight AI Dashboard Mockup](assets/hero_dashboard.png)
 
 [![Production Ready](https://img.shields.io/badge/Status-V4.0--Revenue--Live-emerald.svg)]()
 [![AI Powered](https://img.shields.io/badge/AI-YOLO11%20%2B%20LangGraph-blue.svg)]()
@@ -15,15 +15,15 @@ Experience the full depth of the V4.0 Monetization & Enforcement suite through t
 
 ### 1. Spatial Control Hero
 The primary orchestrator view combining 3D isometric mapping with real-time slot tenancy.
-![Spatial Control Hero](file:///Users/mobcoderid-296/Downloads/parksight-ai-full/assets/hero_dashboard.png)
+![Spatial Control Hero](assets/hero_dashboard.png)
 
 ### 2. Revenue & Monetization Hub
 Live financial tracking with surge-aware multipliers, occupancy vs. revenue trendlines, and currency-localized earnings.
-![Revenue Analytics](file:///Users/mobcoderid-296/Downloads/parksight-ai-full/assets/revenue_analytics.png)
+![Revenue Analytics](assets/revenue_analytics.png)
 
 ### 3. Automated Enforcement Hub
 The deterministic policy engine in action: tracking active E-Challans, resolving violation identities, and automating session settlements.
-![Violation Hub](file:///Users/mobcoderid-296/Downloads/parksight-ai-full/assets/violation_hub.png)
+![Violation Hub](assets/violation_hub.png)
 
 ---
 
