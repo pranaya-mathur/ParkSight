@@ -9,6 +9,8 @@ services:
       - "8000:8000"
     environment:
       - GROQ_API_KEY=${GROQ_API_KEY:-}
+    volumes:
+      - parksight-telemetry:/app/telemetry
     networks:
       - parksight-net
 
@@ -20,6 +22,9 @@ services:
       - api
     environment:
       - API_URL=http://api:8000/system/process
+      - CAMERA_SOURCE=${CAMERA_SOURCE:-MOCK}
+    volumes:
+       - parksight-models:/app/edge/models
     networks:
       - parksight-net
 
@@ -33,6 +38,12 @@ services:
       - api
     networks:
       - parksight-net
+
+volumes:
+  parksight-telemetry:
+    driver: local
+  parksight-models:
+    driver: local
 
 networks:
   parksight-net:

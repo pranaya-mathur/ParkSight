@@ -1,38 +1,67 @@
 import time
+import os
 import random
 import logging
+import cv2
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("camera-service")
 
 class CameraService:
-    """Mock Camera Service to simulate streaming frames from a parking lot."""
+    """Production-ready Camera Service supporting Mock, RTSP, and CSI streams."""
     
-    def __init__(self, camera_id: str = "CAM-01"):
+    def __init__(self, source: str = "MOCK", camera_id: str = "CAM-01"):
         self.camera_id = camera_id
+        self.source = os.getenv("CAMERA_SOURCE", source)
+        self.cap = None
         self.is_running = False
 
     def start(self):
-        logger.info(f"Starting camera stream for {self.camera_id}...")
+        """Initializes the connection to the camera source."""
+        if self.source == "MOCK":
+            logger.info(f"💾 Starting MOCK camera for {self.camera_id}...")
+        else:
+            logger.info(f"🔋 Connecting to RTSP/CSI Source: {self.source}...")
+            self.cap = cv2.VideoCapture(self.source)
+            if not self.cap.isOpened():
+                logger.error("🛑 Failed to open camera source!")
+                return False
+        
         self.is_running = True
+        return True
 
     def get_frame(self):
-        """Simulates capturing a frame with unique meta-data."""
+        """Captures the latest frame from the source."""
         if not self.is_running:
             return None
         
-        # In a real app, this would return a numpy array (image)
-        # For our mock, we return a frame-id and timestamp
-        frame_id = random.randint(1000, 9999)
-        timestamp = time.time()
-        logger.debug(f"Captured frame {frame_id} from {self.camera_id}")
+        if self.source == "MOCK":
+            return {
+                "frame_id": random.randint(1000, 9999),
+                "timestamp": time.time(),
+                "camera_id": self.camera_id,
+                "data": None # Mock data
+            }
+        
+        ret, frame = self.cap.read()
+        if not ret:
+            logger.warning("⚠️ Frame dropped from stream.")
+            return None
+            
         return {
-            "frame_id": frame_id,
-            "timestamp": timestamp,
-            "camera_id": self.camera_id
+            "frame_id": int(time.time()),
+            "timestamp": time.time(),
+            "camera_id": self.camera_id,
+            "data": frame # Raw OpenCV frame (numpy array)
         }
 
+    def stop(self):
+        if self.cap:
+            self.cap.release()
+        self.is_running = False
+
 if __name__ == "__main__":
+    # Test with mock by default
     cam = CameraService()
     cam.start()
     while True:

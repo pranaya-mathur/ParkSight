@@ -1,53 +1,67 @@
 import logging
+from shapely.geometry import Polygon, box
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("slot-engine")
 
 class SlotEngine:
-    """Slot occupancy detection engine (Deterministic fallback).
-    Maps raw CV detections to pre-defined parking slot polygons.
+    """Advanced Slot occupancy detection engine using Shapely Polygons.
+    Supports complex perspective-transformed parking slots.
     """
     
     def __init__(self, num_slots: int = 10):
-        # Define 10 static slots as rectangles: [x, y, w, h] in 0-100 coordinate space
+        # Define 10 slots as Polygons (4 coordinates each) 
+        # to handle camera perspective/slanting.
         self.slots = []
         for i in range(num_slots):
+            x_start = i * 10
+            x_end = x_start + 10
+            # Define a slightly trapezoidal slot to simulate perspective
+            poly = Polygon([
+                (x_start + 1, 25), # Top Left
+                (x_end - 1, 25),   # Top Right
+                (x_end, 45),       # Bottom Right
+                (x_start, 45)      # Bottom Left
+            ])
             self.slots.append({
                 "id": i,
-                "x_range": (i * 10, i * 10 + 10),
-                "y_range": (25, 45)
+                "polygon": poly,
+                "distance": round(i * 5.2, 1)
             })
-        logger.info(f"Initialized SlotEngine with {num_slots} predefined slots.")
+        logger.info(f"Initialized Advanced SlotEngine with {num_slots} polygons.")
 
-    def update_occupancy(self, detections: list):
-        """Calculates which slots are occupied based on detections."""
+    def update_occupancy(self, detections: list, iou_threshold: float = 0.3):
+        """Calculates occupancy based on Intersection over Area (IoA)."""
         occupancy = []
         occupied_slots = set()
         
         for det in detections:
             bbox = det["bbox"] # [x1, y1, x2, y2]
-            # Center of the bounding box
-            cx = (bbox[0] + bbox[2]) / 2
-            cy = (bbox[1] + bbox[3]) / 2
+            det_poly = box(bbox[0], bbox[1], bbox[2], bbox[3])
             
             for slot in self.slots:
-                if (slot["x_range"][0] <= cx <= slot["x_range"][1]) and \
-                   (slot["y_range"][0] <= cy <= slot["y_range"][1]):
-                    occupied_slots.add(slot["id"])
+                slot_poly = slot["polygon"]
+                # Calculate Intersection over Slot Area
+                if slot_poly.intersects(det_poly):
+                    intersection_area = slot_poly.intersection(det_poly).area
+                    ioa = intersection_area / slot_poly.area
+                    
+                    if ioa >= iou_threshold:
+                        occupied_slots.add(slot["id"])
                     
         for slot in self.slots:
             status = "occupied" if slot["id"] in occupied_slots else "free"
             occupancy.append({
                 "id": slot["id"],
                 "status": status,
-                # Random mock distance for guidance logic
-                "distance": round(slot["id"] * 5.5, 1) 
+                "distance": slot["distance"]
             })
             
-        logger.debug(f"Occupancy Map: {occupancy}")
+        logger.debug(f"Polygon Occupancy Map: {occupancy}")
         return occupancy
 
 if __name__ == "__main__":
     se = SlotEngine()
-    test_det = [{"label": "car", "bbox": [5, 30, 15, 40]}] # Overlaps with Slot 0/1
+    # Test collision with a slanting polygon
+    test_det = [{"label": "car", "bbox": [2, 30, 8, 40]}] # Mostly overlaps Slot 0
     print(se.update_occupancy(test_det))

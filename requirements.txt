@@ -7,11 +7,13 @@ uvicorn
 pydantic
 python-dotenv
 requests
+shapely
 
 # AI & Orchestration
 langchain
 langgraph
 langchain-groq
+shapely
 
 # Computer Vision (Edge)
 ultralytics

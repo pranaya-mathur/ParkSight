@@ -1,5 +1,5 @@
 import os
-from typing import TypedDict, List
+from typing import TypedDict, List, Literal
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -12,48 +12,72 @@ class PlanState(TypedDict):
     explanation: str
     violations: List[dict]
     best_slot: int
+    classification: Literal["STANDARD", "URGENT"]
 
 def build_graph():
-    """Builds a LangGraph orchestrator using Groq for parking explanations."""
+    """Builds a LangGraph orchestrator with Conditional Routing for parking alerts."""
     
     # Initialize Groq LLM
     llm = ChatGroq(
         temperature=0,
-        model_name="llama3-70b-8192", # Excellent for complex reasoning
+        model_name="llama3-70b-8192", 
         groq_api_key=os.getenv("GROQ_API_KEY")
     )
 
     workflow = StateGraph(PlanState)
 
-    def orchestrator(state: PlanState):
-        """Orchestrates the guidance message based on the scene and violations."""
-        scene = state["scene"]
+    def classifier(state: PlanState):
+        """Classifies the scene as STANDARD or URGENT based on violations."""
         violations = state["violations"]
+        hazards = state["scene"].get("hazards", [])
         
-        # Analyze scene for the user
-        free_slots = [s["id"] for s in scene["slots"] if s["status"] == "free"]
-        
-        system_msg = SystemMessage(content=(
-            "You are ParkSight AI, an intelligent parking guidance system. "
-            "Explain the current parking situation concisely to the user. "
-            "Address any safety hazards or policy violations immediately. "
-            "Mention the best available slot based on distance if applicable."
-        ))
-        
-        user_msg = HumanMessage(content=(
-            f"Scene Data: {scene}\n"
-            f"Violations: {violations}\n"
-            f"Free Slots: {free_slots}\n"
-            "Please provide a 2-sentence explanation of the status."
-        ))
-        
+        # Any high-severity violation or non-empty hazard list triggers URGENT
+        is_urgent = any(v.get("severity") == "High" for v in violations) or len(hazards) > 0
+        state["classification"] = "URGENT" if is_urgent else "STANDARD"
+        return state
+
+    def standard_explainer(state: PlanState):
+        """Standard guidance explainer."""
+        scene = state["scene"]
+        system_msg = SystemMessage(content="You are ParkSight AI. Be polite and helpful.")
+        user_msg = HumanMessage(content=f"Scene: {scene}\nExplain the current status for the driver.")
         response = llm.invoke([system_msg, user_msg])
         state["explanation"] = response.content
         return state
 
-    workflow.add_node("explain", orchestrator)
-    workflow.set_entry_point("explain")
-    workflow.add_edge("explain", END)
+    def urgent_alerter(state: PlanState):
+        """Urgent alert generator for safety issues."""
+        scene = state["scene"]
+        violations = state["violations"]
+        system_msg = SystemMessage(content="You are ParkSight AI / EMERGENCY ALERT. Be direct and authoritative.")
+        user_msg = HumanMessage(content=f"DANGER: {scene.get('hazards')}\nExplain the IMMEDIATE actions required.")
+        response = llm.invoke([system_msg, user_msg])
+        state["explanation"] = f"CRITICAL: {response.content}"
+        return state
+
+    # Add nodes
+    workflow.add_node("classify", classifier)
+    workflow.add_node("explain_standard", standard_explainer)
+    workflow.add_node("explain_urgent", urgent_alerter)
+
+    # Entry and routing
+    workflow.set_entry_point("classify")
+
+    # Conditional Routing
+    def route_decision(state: PlanState):
+        return state["classification"]
+
+    workflow.add_conditional_edges(
+        "classify",
+        route_decision,
+        {
+            "STANDARD": "explain_standard",
+            "URGENT": "explain_urgent"
+        }
+    )
+
+    workflow.add_edge("explain_standard", END)
+    workflow.add_edge("explain_urgent", END)
 
     return workflow.compile()
 
@@ -61,9 +85,10 @@ if __name__ == "__main__":
     # Test stub
     graph = build_graph()
     mock_state = {
-        "scene": {"slots": [{"id": 0, "status": "free", "distance": 1.0}]},
+        "scene": {"slots": [], "hazards": ["Oil Leak"]},
         "violations": [],
         "explanation": "",
         "best_slot": -1
     }
-    # print(graph.invoke(mock_state))
+    # result = graph.invoke(mock_state)
+    # print(result["explanation"])

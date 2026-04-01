@@ -40,8 +40,25 @@ helm install parksight ./infra/helm
 GitHub → CodeBuild → ECR → EKS (+ Edge OTA)
 
 ## Folders
-- edge/
-- cloud/
-- langgraph/
-- infra/helm/
 - docker/
+---
+
+## Roadmap
+
+### Immediate (Priority 1)
+- **Real CV Integration**: Replace mock perception with Ultralytics YOLO26-N + TensorRT export.
+- **Advanced Slot Logic**: Upgrade `slot_engine` to true polygons (Shapely) with homography calibration.
+- **Hardware Support**: Add RTSP/CSI camera stream support.
+- **Smart Orchestration**: Expand LangGraph with conditional routing for urgent alerts.
+- **Persistence**: Add Docker volumes and persistent telemetry logging.
+
+### Medium-Term (Priority 2)
+- **Scalability**: Multi-camera support and cross-camera tracking.
+- **UI/UX**: AR guidance overlay and complex real-time occupancy heatmaps.
+- **Observability**: Integration with Prometheus/Grafana for enterprise telemetry.
+- **Quality**: Automated CI/CD pipelines via GitHub Actions.
+
+### Advanced (Long-Term)
+- **Re-ID**: Vehicle re-identification and license-plate linking.
+- **Dynamic Mapping**: Learning slot locations automatically from historical patterns.
+- **Resilience**: Edge-only fallback mode for cloud outages.

@@ -1,24 +1,26 @@
 from .slot_engine import SlotEngine
+import pytest
 
-def test_slot_occupancy():
+def test_polygon_occupancy():
     engine = SlotEngine(num_slots=10)
     
-    # Test case 1: Vehicle in slot 0
-    detections = [{"label": "car", "bbox": [5, 30, 8, 40]}] # Center (6.5, 35) is in Slot 0 (0-10, 25-45)
-    occupancy = engine.update_occupancy(detections)
+    # Test case 1: Vehicle mostly in slot 0 (Trapezoidal: 1,25 -> 9,25 -> 10,45 -> 0,45)
+    # Area approximately 180 (Base 10, Height 20)
+    # Bbox: 2, 30, 8, 40 (Area 60)
+    detections = [{"label": "car", "bbox": [2, 30, 8, 40]}] 
+    occupancy = engine.update_occupancy(detections, iou_threshold=0.3)
     assert occupancy[0]["status"] == "occupied"
     assert occupancy[1]["status"] == "free"
 
-    # Test case 2: Vehicle in slot 5
-    detections = [{"label": "car", "bbox": [52, 30, 58, 40]}] # Center (55, 35) is in Slot 5 (50-60, 25-45)
-    occupancy = engine.update_occupancy(detections)
-    assert occupancy[5]["status"] == "occupied"
-    assert occupancy[4]["status"] == "free"
+    # Test case 2: Small detection, not enough to occupy (IoA < 0.3)
+    detections = [{"label": "car", "bbox": [5, 30, 6, 31]}] # Area 1
+    occupancy = engine.update_occupancy(detections, iou_threshold=0.3)
+    assert occupancy[0]["status"] == "free"
 
-    print("Slot Engine tests passed!")
+    print("Polygon Slot Engine tests passed!")
 
 if __name__ == "__main__":
     try:
-        test_slot_occupancy()
+        test_polygon_occupancy()
     except AssertionError as e:
         print(f"Tests failed: {e}")
