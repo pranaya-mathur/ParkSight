@@ -31,4 +31,8 @@ edge/*.onnx
 .vscode/
 .idea/
 *.swp
-*.swo
+# Databases & Local History
+*.db
+*.sqlite3
+*.log
+telemetry/

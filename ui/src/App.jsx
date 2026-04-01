@@ -6,247 +6,281 @@ import {
   Activity, 
   CheckCircle2, 
   AlertTriangle,
-  Info,
-  MapPin
+  LayoutDashboard,
+  BarChart3,
+  History,
+  Settings,
+  ChevronRight,
+  Camera,
+  Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const App = () => {
-  const [data, setData] = useState(null);
+  const [view, setView] = useState('live');
+  const [selectedCamera, setSelectedCamera] = useState('CAM-01');
+  const [data, setData] = useState({ slots: [], hazards: [], summary: {} });
+  const [stats, setStats] = useState(null);
+  const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Poll for data every 5 seconds
+  // Fetch all data for the selected camera
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAll = async () => {
       try {
-        // In a real environment, this would hit the FastAPI endpoint
-        // For development/demo, we return a mock scene if the backend isn't up
-        const response = await fetch('/api/system/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            camera_id: "CAM-01",
-            timestamp: Date.now() / 1000,
-            slots: Array.from({ length: 10 }, (_, i) => ({
-              id: i,
-              status: Math.random() > 0.5 ? "occupied" : "free",
-              distance: i * 5.2
-            })),
-            hazards: Math.random() > 0.8 ? ["Oil Leak (Simulated)"] : [],
-            confidence: 0.98
-          })
-        });
-        
-        if (!response.ok) throw new Error('API not reachable');
-        const json = await response.json();
-        setData(json);
-        setError(null);
+        const [telRes, heatRes, violRes] = await Promise.all([
+          fetch(`/api/telemetry/summary?camera_id=${selectedCamera}`).then(r => r.json()),
+          fetch(`/api/analytics/heatmap?camera_id=${selectedCamera}`).then(r => r.json()),
+          fetch(`/api/analytics/violations?camera_id=${selectedCamera}`).then(r => r.json())
+        ]);
+
+        if (telRes.length > 0) {
+          setData(telRes[0].data);
+        }
+        setStats(heatRes);
+        setViolations(violRes);
       } catch (err) {
-        // Fail-safe mock for UI development
-        setData({
-          guidance: {
-            message: "Operating in simulation mode. Backend offline.",
-            best_slot: 2,
-            violations: []
-          },
-          status: "simulated"
-        });
+        console.error("Fetch error:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
+    fetchAll();
+    const interval = setInterval(fetchAll, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedCamera]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-      >
-        <Activity size={48} color="#6366f1" />
-      </motion.div>
+  const NavItem = ({ id, icon: Icon, label }) => (
+    <div 
+      onClick={() => setView(id)}
+      className={`nav-item ${view === id ? 'active' : ''}`}
+    >
+      <Icon size={20} />
+      <span>{label}</span>
+      {view === id && <motion.div layoutId="nav-pill" className="ml-auto w-1 h-4 bg-primary rounded-full" />}
     </div>
   );
 
-  const { guidance } = data || {};
-  const mockSlots = Array.from({ length: 10 }, (_, i) => ({
-    id: i,
-    status: (i === 1 || i === 4 || i === 7) ? "occupied" : "free",
-    distance: i * 5.2
-  }));
-
   return (
-    <div className="flex-1 overflow-auto p-8 max-w-7xl mx-auto w-full">
-      {/* Header with AI guidance */}
-      <header className="mb-12">
-        <div className="flex items-center gap-4 mb-4">
-          <ShieldAlert className="text-primary" size={40} />
-          <h1>ParkSight AI <span style={{fontSize: '1rem', fontWeight: 400, opacity: 0.6}}>v1.0 (Production)</span></h1>
+    <>
+      {/* Sidebar Navigation */}
+      <aside className="sidebar">
+        <div className="flex items-center gap-3 px-2 mb-4">
+          <ShieldAlert className="text-primary" size={32} />
+          <h1 className="text-xl">ParkSight <span className="text-sm font-normal opacity-50">v1.1</span></h1>
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass p-6 flex flex-col md:flex-row items-center gap-6"
-          style={{ borderLeft: '4px solid var(--primary)' }}
-        >
-          <div className="p-4 rounded-full bg-indigo-500/20">
-            <Navigation className="text-primary animate-pulse" size={32} />
-          </div>
-          <div className="flex-1">
-            <h2 className="mb-1">AI Guidance</h2>
-            <p className="text-lg text-slate-200">{guidance?.message || "Analyzing lot occupancy..."}</p>
-          </div>
-          {guidance?.best_slot !== -1 && (
-            <div className="px-6 py-3 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
-              Best Slot: <strong className="text-xl">#{guidance?.best_slot}</strong>
-            </div>
-          )}
-        </motion.div>
-      </header>
+        <nav className="flex-1">
+          <NavItem id="live" icon={LayoutDashboard} label="Live Map" />
+          <NavItem id="analytics" icon={BarChart3} label="Analytics" />
+          <NavItem id="violations" icon={History} label="Violation Log" />
+        </nav>
 
-      {/* Main Dashboard Grid */}
-      <main>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="glass p-6 text-center">
-            <h3 className="text-slate-400 text-sm mb-2 uppercase tracking-wider">Utilization</h3>
-            <p className="text-3xl font-bold text-primary">40%</p>
-          </div>
-          <div className="glass p-6 text-center">
-            <h3 className="text-slate-400 text-sm mb-2 uppercase tracking-wider">Peak Hour Status</h3>
-            <p className="text-3xl font-bold text-emerald-400">OPTIMAL</p>
-          </div>
-          <div className="glass p-6 text-center">
-            <h3 className="text-slate-400 text-sm mb-2 uppercase tracking-wider">Alerts (24h)</h3>
-            <p className="text-3xl font-bold text-rose-400">2</p>
-          </div>
+        <div className="pt-4 border-t border-slate-800">
+          <NavItem id="settings" icon={Settings} label="System Config" />
         </div>
+      </aside>
 
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="flex items-center gap-2">
-            <MapPin size={20} className="text-slate-400" />
-            Live Map & Guidance
-          </h2>
-          <div className="flex gap-2">
-            <span className="px-3 py-1 glass text-xs rounded-full border border-emerald-500/30 text-emerald-400">
-              ● All Slots Active
-            </span>
+      {/* Main Content Area */}
+      <main className="main-content">
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h2 className="text-2xl font-bold">{view === 'live' ? 'Real-time Guidance' : view.toUpperCase()}</h2>
+            <p className="text-slate italic">Precision occupancy & safety orchestration</p>
           </div>
-        </div>
 
-        {/* 3D-Like Parking Map with Guidance Overlay */}
-        <div className="relative glass h-[400px] mb-8 overflow-hidden rounded-2xl group">
-          <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center">
-            {/* Simulated Grid Slots */}
-            <div className="flex gap-4 p-8 items-end h-full w-full justify-around">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
-                <div key={i} className={`w-16 h-32 rounded-lg border-2 border-dashed transition-all duration-500 
-                  ${i === 0 ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-800/40 border-slate-700'}`}>
-                  <div className="text-[10px] text-slate-500 text-center mt-2 uppercase">SLOT {i}</div>
-                </div>
+          <div className="flex items-center gap-4">
+            <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800">
+              {['CAM-01', 'CAM-02'].map(cam => (
+                <button
+                  key={cam}
+                  onClick={() => setSelectedCamera(cam)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedCamera === cam ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {cam}
+                </button>
               ))}
             </div>
-            
-            {/* AR Guidance Path Overlay */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none">
-              <defs>
-                <linearGradient id="guidanceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.1" />
-                </linearGradient>
-              </defs>
-              <path d="M 500,400 Q 400,300 50,150" fill="none" stroke="url(#guidanceGradient)" strokeWidth="8" strokeLinecap="round" className="animate-pulse" />
-              <circle cx="50" cy="150" r="10" fill="#10b981" className="animate-ping" />
-            </svg>
-
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 glass px-6 py-3 border-emerald-500/50">
-              <p className="text-emerald-400 font-medium flex items-center gap-3">
-                <ChevronRight size={18} />
-                GUIDANCE: TURN LEFT 45° INTO SLOT 0
-              </p>
+            <div className="glass px-4 py-2 flex items-center gap-3 border-emerald-500/20">
+              <div className="status-indicator status-active" />
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-tighter">System Health: Optimal</span>
             </div>
           </div>
-        </div>
+        </header>
 
-        <div className="dashboard-grid">
-          <AnimatePresence>
-            {mockSlots.map((slot) => (
-              <motion.div
-                key={slot.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="glass glass-hover slot-card"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-slate-400">SLOT #{slot.id}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${
-                    slot.status === 'occupied' ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
-                  }`}>
-                    {slot.status.toUpperCase()}
-                  </span>
+        <AnimatePresence mode="wait">
+          {view === 'live' && (
+            <motion.div 
+              key="live"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              {/* Guidance Banner */}
+              <div className="glass p-6 mb-8 flex items-center gap-6 border-l-4 border-indigo-500">
+                <div className="p-3 bg-indigo-500/10 rounded-xl text-primary">
+                  <Navigation className="animate-pulse" size={28} />
                 </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">AI Orchestrator</span>
+                  <p className="text-lg font-medium">
+                    {data.guidance?.instruction || "Scanning parking geometry for optimal paths..."}
+                  </p>
+                </div>
+                {data.occupancy_duration > 0 && (
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Time in Scene</span>
+                    <span className="text-xl font-mono text-primary">{Math.floor(data.occupancy_duration)}s</span>
+                  </div>
+                )}
+              </div>
 
-                <div className="slot-visual">
-                  {slot.status === 'occupied' ? (
-                    <Car className="car-icon text-rose-400" size={64} />
-                  ) : (
-                    <div className="text-emerald-500/20 font-bold text-4xl">FREE</div>
-                  )}
-                  {guidance?.best_slot === slot.id && slot.status === 'free' && (
-                    <div className="absolute top-2 right-2 bg-primary text-white p-1 rounded-full">
-                      <CheckCircle2 size={16} />
+              {/* Live Grid */}
+              <div className="dashboard-grid">
+                {data.slots?.map(slot => (
+                  <div key={slot.id} className={`glass glass-hover slot-card ${slot.id === data.guidance?.best_slot ? 'glass-active' : ''}`}>
+                    <div className="flex justify-between items-center mb-2">
+                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slot #{slot.id}</span>
+                       <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                         slot.status === 'occupied' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent'
+                       }`}>
+                         {slot.status}
+                       </div>
                     </div>
-                  )}
-                </div>
+                    
+                    <div className="slot-visual">
+                      {slot.status === 'occupied' && (
+                        <>
+                          <div className="duration-badge"><Timer size={10} className="inline mr-1" /> {Math.round(slot.occupancy_duration)}s</div>
+                          <Car className="text-white/20" size={64} />
+                        </>
+                      )}
+                      {slot.id === data.guidance?.best_slot && slot.status === 'free' && (
+                        <motion.div 
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ repeat: Infinity, duration: 2 }}
+                          className="text-primary flex flex-col items-center gap-1"
+                        >
+                          <CheckCircle2 size={32} />
+                          <span className="text-[10px] font-bold">RECOMMENDED</span>
+                        </motion.div>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-between text-[10px] font-bold text-slate-600 mt-2">
+                      <span>DIST: {slot.distance}m</span>
+                      <span>PERSPECTIVE: VALID</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>Distance: {slot.distance}m</span>
-                  <span>Edge: {data?.status === 'simulated' ? 'MOCK' : 'YOLO26-N'}</span>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      </main>
-
-      {/* Incident Panel */}
-      {guidance?.violations?.length > 0 && (
-        <section className="mt-12">
-          <h2 className="mb-4 text-rose-400 flex items-center gap-2">
-            <AlertTriangle size={24} />
-            Security Alerts
-          </h2>
-          <div className="grid gap-4">
-            {guidance.violations.map((v, i) => (
-              <div key={i} className="glass p-4 border-l-4 border-rose-500 flex items-center gap-4">
-                <ShieldAlert className="text-rose-500" />
-                <div>
-                  <h4 className="font-bold text-rose-300">{v.type}</h4>
-                  <p className="text-sm">{v.description}</p>
+          {view === 'analytics' && (
+            <motion.div 
+              key="analytics"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
+              <div className="glass p-8">
+                <h3 className="mb-6 flex items-center gap-2"><Activity size={20} className="text-primary" /> Occupancy Heatmap</h3>
+                <div className="flex flex-col gap-4">
+                  {stats?.slots?.map(s => (
+                    <div key={s.slot_id} className="flex items-center gap-4">
+                      <span className="w-12 text-xs font-bold text-slate-500">#{s.slot_id}</span>
+                      <div className="flex-1 h-3 bg-slate-900 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${s.utilization_percent}%` }}
+                          className={`h-full ${s.utilization_percent > 70 ? 'bg-danger' : s.utilization_percent > 30 ? 'bg-primary' : 'bg-slate-700'}`}
+                        />
+                      </div>
+                      <span className="text-xs font-mono">{s.utilization_percent}%</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+              
+              <div className="glass p-8 bg-gradient-to-br from-slate-900/50 to-indigo-900/10">
+                <h3 className="mb-6 flex items-center gap-2"><Timer size={20} className="text-primary" /> Peak Hour Insights</h3>
+                {stats?.error ? (
+                  <p className="text-slate">No telemetry data found for {selectedCamera}</p>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center p-4 rounded-xl bg-slate-900/40">
+                      <span className="text-slate italic font-medium">Average Load</span>
+                      <span className="text-2xl font-black text-primary">{Math.round((stats?.slots?.reduce((a,b)=>a+b.utilization_percent,0)/10) || 0)}%</span>
+                    </div>
+                    <div className="p-4 border-l-2 border-primary/20">
+                      <p className="text-xs text-slate uppercase font-bold mb-1 tracking-widest text-primary">Recommendation</p>
+                      <p className="text-sm">High utilization detected on center slots. Consider dynamic pricing or EV priority shifts.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
-      {/* Footer Info */}
-      <footer className="mt-20 pt-8 border-t border-slate-800 flex justify-between text-slate-500 text-sm">
-        <div className="flex items-center gap-2">
-          <Activity size={16} className="text-primary animate-pulse" />
-          <span>Camera Stream: CAM-01 (ACTIVE)</span>
-        </div>
-        <div>
-          LLM Engine: LangGraph + Groq (Llama3-70B)
-        </div>
-      </footer>
-    </div>
+          {view === 'violations' && (
+            <motion.div 
+              key="violations"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="flex items-center gap-2 text-rose-400 font-bold uppercase tracking-widest text-sm">
+                  <AlertTriangle size={18} /> Safety & Policy Incident Log
+                </h3>
+                <span className="glass px-3 py-1 text-[10px] font-bold border-rose-500/20 text-rose-400 uppercase">
+                  Reporting Node: {selectedCamera}
+                </span>
+              </div>
+              
+              <div className="space-y-4">
+                {violations?.total_incidents === 0 ? (
+                  <div className="glass p-20 text-center flex flex-col items-center gap-4">
+                    <CheckCircle2 size={48} className="text-accent opacity-20" />
+                    <p className="text-slate italic">All clear. No safety violations or overstays detected.</p>
+                  </div>
+                ) : (
+                  Object.entries(violations?.breakdown || {}).map(([type, count], i) => (
+                    <div key={i} className="glass p-6 flex items-center gap-6 border-l-4 border-danger">
+                      <div className="p-3 bg-danger/10 rounded-xl text-danger">
+                        <AlertTriangle className="animate-pulse" size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-slate-200">{type}</h4>
+                        <p className="text-xs text-slate italic">Frequency detected: {count} instance(s) in last 500 samples</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="px-3 py-1.5 rounded-lg bg-danger text-white text-[10px] font-bold shadow-lg shadow-danger/20">RESOLVE</button>
+                        <button className="px-3 py-1.5 rounded-lg glass text-[10px] font-bold">DISMISS</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Footer Persistence Indicator */}
+        <footer className="mt-auto pt-10 flex justify-between items-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+           <div className="flex items-center gap-2">
+             <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+             <span>Telemetry Tunnel: {selectedCamera} @ REST v1.1</span>
+           </div>
+           <div>SQL Persistence: ACTIVE (parksight.db)</div>
+        </footer>
+      </main>
+    </>
   );
 };
 

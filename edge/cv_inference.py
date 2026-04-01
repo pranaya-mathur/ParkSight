@@ -56,18 +56,36 @@ class CVInference:
         return detections
 
     def _fetch_simulated_detections(self):
-        """High-quality simulated detections for local development."""
-        import random
+        """Deterministic cyclic simulation for enterprise-grade testing and demos."""
+        import time
+        t = int(time.time())
+        # 20-second cycle: 0-10s (Slots 0-4 occupied), 10-20s (Slots 5-9 occupied)
+        cycle_pos = t % 20
+        is_first_half = cycle_pos < 10
+        
         detections = []
-        num_vehicles = random.randint(3, 8)
-        for _ in range(num_vehicles):
-            slot_id = random.randint(0, 9)
+        target_slots = range(0, 5) if is_first_half else range(5, 10)
+        
+        # Every 5 cycles (100s), simulate an overstay at Slot 0 by keeping it occupied
+        if (t % 100) < 65: 
+             target_slots = list(set(list(target_slots) + [0]))
+
+        for slot_id in target_slots:
             x_base = slot_id * 10
             detections.append({
                 "label": "car",
-                "confidence": random.uniform(0.9, 0.99),
+                "confidence": 0.98,
                 "bbox": [x_base + 2, 30, x_base + 8, 40]
             })
+        
+        # Periodic Safety Hazard (every 30s)
+        if (t % 30) < 5:
+            detections.append({
+                "label": "person",
+                "confidence": 0.95,
+                "bbox": [15, 45, 18, 55]
+            })
+
         return detections
 
 if __name__ == "__main__":

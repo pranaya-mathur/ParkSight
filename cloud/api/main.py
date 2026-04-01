@@ -8,14 +8,11 @@ from .telemetry import TelemetrySystem
 from .reports import ReportGenerator
 from .notifications import NotificationService
 from .analytics_service import AnalyticsService
-from langgraph.graph import StateGraph
+from .analytics_service import AnalyticsService
+from brain.graph import build_graph
 
-# Load environment variables (GROQ_API_KEY, etc.)
+# Load environment variables once
 load_dotenv()
-# Absolute imports for langgraph
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from langgraph.graph import build_graph
 
 app = FastAPI(title="ParkSight API - Production")
 

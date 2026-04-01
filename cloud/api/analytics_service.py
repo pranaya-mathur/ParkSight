@@ -17,12 +17,15 @@ class AnalyticsService:
         total_samples = 0
         
         for entry in self.history:
-            if entry["type"] == "Scene Update":
-                total_samples += 1
-                for slot in entry["data"]["slots"]:
-                    slot_id = slot["id"]
-                    if slot["status"] == "occupied":
-                        slot_usage[slot_id] = slot_usage.get(slot_id, 0) + 1
+            if entry.get("type") == "Scene Update":
+                data = entry.get("data", {})
+                slots = data.get("slots", [])
+                if slots:
+                    total_samples += 1
+                    for slot in slots:
+                        slot_id = slot.get("id")
+                        if slot_id is not None and slot.get("status") == "occupied":
+                            slot_usage[slot_id] = slot_usage.get(slot_id, 0) + 1
                         
         if total_samples == 0:
             return {"error": "No occupancy data samples found."}
@@ -49,14 +52,18 @@ class AnalyticsService:
         hourly_usage = {i: [] for i in range(24)}
         
         for entry in self.history:
-            if entry["type"] == "Scene Update":
-                ts = entry["timestamp"]
-                # Handle both float (epoch) and string (ISO) timestamps
-                dt = datetime.fromisoformat(ts) if isinstance(ts, str) else datetime.fromtimestamp(ts)
-                hour = dt.hour
+            if entry.get("type") == "Scene Update":
+                ts = entry.get("timestamp")
+                data = entry.get("data", {})
+                slots = data.get("slots", [])
                 
-                occupied_count = sum(1 for s in entry["data"]["slots"] if s["status"] == "occupied")
-                hourly_usage[hour].append(occupied_count)
+                if ts and slots:
+                    # Handle both float (epoch) and string (ISO) timestamps
+                    dt = datetime.fromisoformat(ts) if isinstance(ts, str) else datetime.fromtimestamp(ts)
+                    hour = dt.hour
+                    
+                    occupied_count = sum(1 for s in slots if s.get("status") == "occupied")
+                    hourly_usage[hour].append(occupied_count)
         
         trends = []
         for hour, counts in hourly_usage.items():

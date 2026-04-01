@@ -36,8 +36,10 @@ class CameraService:
             return None
         
         if self.source == "MOCK":
+            # Deterministic ID for tracking
+            mock_id = int(time.time() * 100) % 100000
             return {
-                "frame_id": random.randint(1000, 9999),
+                "frame_id": mock_id,
                 "timestamp": time.time(),
                 "camera_id": self.camera_id,
                 "data": None # Mock data

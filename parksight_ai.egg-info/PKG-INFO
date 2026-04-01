@@ -1,3 +1,24 @@
+Metadata-Version: 2.4
+Name: parksight-ai
+Version: 1.1.0
+Summary: Enterprise-grade intelligent parking guidance system.
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: pydantic
+Requires-Dist: sqlalchemy
+Requires-Dist: psycopg2-binary
+Requires-Dist: shapely
+Requires-Dist: ultralytics
+Requires-Dist: opencv-python-headless
+Requires-Dist: numpy
+Requires-Dist: langgraph
+Requires-Dist: langchain-groq
+Requires-Dist: python-dotenv
+Requires-Dist: httpx
+Requires-Dist: pytest
+
 # ParkSight AI: Enterprise Parking Guidance & Analytics
 
 [![Production Ready](https://img.shields.io/badge/Status-Production--Ready-green.svg)]()
