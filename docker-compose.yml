@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    networks:
+      - parksight-net
+
+  edge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.edge
+    depends_on:
+      - api
+    environment:
+      - API_URL=http://api:8000/system/process
+    networks:
+      - parksight-net
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - parksight-net
+
+networks:
+  parksight-net:
+    driver: bridge

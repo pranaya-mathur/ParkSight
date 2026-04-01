@@ -1,0 +1,25 @@
+# ParkSight AI - Root Requirements
+# Consolidated for all services (API, Edge, Graph)
+
+# Core API & Web
+fastapi
+uvicorn
+pydantic
+python-dotenv
+requests
+
+# AI & Orchestration
+langchain
+langgraph
+langchain-groq
+
+# Computer Vision (Edge)
+ultralytics
+opencv-python-headless
+numpy
+torch
+torchvision
+
+# Development & Testing
+pytest
+httpx

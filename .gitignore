@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment variables
+.env
+.env.test
+.env.production
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Models & Weights
+edge/*.pt
+edge/*.tflite
+edge/*.onnx
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

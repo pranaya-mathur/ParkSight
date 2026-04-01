@@ -1,0 +1,4 @@
+FROM python:3.10-slim
+WORKDIR /app
+COPY edge /app/edge
+CMD ["python", "-m", "edge.scene_builder"]
