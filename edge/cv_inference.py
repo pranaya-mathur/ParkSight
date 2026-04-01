@@ -46,7 +46,7 @@ class CVInference:
                 conf = float(box.conf[0])
                 
                 # Optimized filtering for parking scenarios
-                if label in ["car", "truck", "bus", "motorcycle", "person", "stop sign"]:
+                if label in ["car", "truck", "bus", "motorcycle", "person", "stop sign", "bicycle", "fire hydrant"]:
                     detections.append({
                         "label": label,
                         "confidence": conf,

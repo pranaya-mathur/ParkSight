@@ -43,10 +43,71 @@ class AnalyticsService:
             "total_samples": total_samples
         }
 
+    def get_usage_trends(self):
+        """Groups occupancy by 'hour of day' to identify peak usage trends."""
+        from datetime import datetime
+        hourly_usage = {i: [] for i in range(24)}
+        
+        for entry in self.history:
+            if entry["type"] == "Scene Update":
+                ts = entry["timestamp"]
+                # Handle both float (epoch) and string (ISO) timestamps
+                dt = datetime.fromisoformat(ts) if isinstance(ts, str) else datetime.fromtimestamp(ts)
+                hour = dt.hour
+                
+                occupied_count = sum(1 for s in entry["data"]["slots"] if s["status"] == "occupied")
+                hourly_usage[hour].append(occupied_count)
+        
+        trends = []
+        for hour, counts in hourly_usage.items():
+            if counts:
+                avg = round(sum(counts) / len(counts), 1)
+                trends.append({"hour": f"{hour:02d}:00", "avg_occupied": avg})
+        
+        return sorted(trends, key=lambda x: x["hour"])
+
+    def get_violation_report(self):
+        """Aggregates all hazards and overstay violations into a summary report."""
+        violations = {}
+        total_violations = 0
+        
+        for entry in self.history:
+            if entry["type"] == "Scene Update":
+                hazards = entry["data"].get("hazards", [])
+                for h in hazards:
+                    violations[h] = violations.get(h, 0) + 1
+                    total_violations += 1
+                    
+        return {
+            "total_incidents": total_violations,
+            "breakdown": violations,
+            "status": "Critical" if total_violations > 10 else "Normal"
+        }
+
 if __name__ == "__main__":
+    # Test stub with multi-type data
     mock_history = [
-        {"type": "Scene Update", "data": {"slots": [{"id": 0, "status": "occupied"}, {"id": 1, "status": "free"}]}},
-        {"type": "Scene Update", "data": {"slots": [{"id": 0, "status": "occupied"}, {"id": 1, "status": "occupied"}]}}
+        {
+            "type": "Scene Update", 
+            "timestamp": "2026-04-01T10:00:00", 
+            "data": {
+                "slots": [{"id": 0, "status": "occupied"}],
+                "hazards": ["Safety Hazard: person detected"]
+            }
+        },
+        {
+            "type": "Scene Update", 
+            "timestamp": "2026-04-01T11:00:00", 
+            "data": {
+                "slots": [{"id": 0, "status": "occupied"}, {"id": 1, "status": "occupied"}],
+                "hazards": ["Overstay Violation: Slot 0"]
+            }
+        }
     ]
     ans = AnalyticsService(mock_history)
+    print("--- Heatmap ---")
     print(ans.get_occupancy_heatmap())
+    print("\n--- Usage Trends ---")
+    print(ans.get_usage_trends())
+    print("\n--- Violation Report ---")
+    print(ans.get_violation_report())

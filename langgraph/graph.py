@@ -65,13 +65,26 @@ def build_graph():
         return state
 
     def urgent_alerter(state: PlanState):
-        """Urgent alert generator for safety issues."""
+        """Urgent alert generator for safety issues and policy violations."""
         scene = state["scene"]
+        hazards = scene.get("hazards", [])
         guidance = scene.get("guidance", {})
-        system_msg = SystemMessage(content="You are ParkSight AI / EMERGENCY ALERT. Be direct and authoritative.")
-        user_msg = HumanMessage(content=f"DANGER: {scene.get('hazards')}\nGuidance: {guidance.get('instruction', 'Stop immediately')}\nExplain the IMMEDIATE actions required.")
+        
+        system_msg = SystemMessage(content=(
+            "You are ParkSight AI / EMERGENCY ALERT. "
+            "Identify the specific hazard (e.g., Safety Hazard, Overstay, Infrastructure) and provide IMMEDIATE corrective actions."
+            "Keep it authoritative and brief."
+        ))
+        
+        user_msg = HumanMessage(content=(
+            f"URGENT DANGER/VIOLATION: {hazards}\n"
+            f"Scene Context: {scene}\n"
+            f"Guidance: {guidance.get('instruction', 'Stop immediately')}\n"
+            "Explain the specific risk and the required action."
+        ))
+        
         response = llm.invoke([system_msg, user_msg])
-        state["explanation"] = f"CRITICAL: {response.content}"
+        state["explanation"] = f"🔴 ALERT: {response.content}"
         return state
 
     # Add nodes

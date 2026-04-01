@@ -1,3 +1,4 @@
+import time
 import logging
 import numpy as np
 from shapely.geometry import Polygon, box
@@ -44,7 +45,8 @@ class SlotEngine:
                 "polygon": poly,
                 "distance": round(i * 5.2, 1)
             })
-        logger.info(f"Initialized SlotEngine with Homography support (3x3 Matrix).")
+        self.slot_timers = {} # Tracks {slot_id: start_timestamp}
+        logger.info(f"Initialized SlotEngine with Homography and Overstay tracking.")
 
     def update_occupancy(self, detections: list, iou_threshold: float = 0.3):
         """Calculates occupancy after perspective correction."""
@@ -66,11 +68,23 @@ class SlotEngine:
                         occupied_slots.add(slot["id"])
                     
         for slot in self.slots:
-            status = "occupied" if slot["id"] in occupied_slots else "free"
+            is_occupied = slot["id"] in occupied_slots
+            status = "occupied" if is_occupied else "free"
+            
+            # Timer management
+            duration = 0
+            if is_occupied:
+                if slot["id"] not in self.slot_timers:
+                    self.slot_timers[slot["id"]] = time.time()
+                duration = time.time() - self.slot_timers[slot["id"]]
+            else:
+                self.slot_timers.pop(slot["id"], None)
+
             occupancy.append({
                 "id": slot["id"],
                 "status": status,
-                "distance": slot["distance"]
+                "distance": slot["distance"],
+                "occupancy_duration": round(duration, 1)
             })
             
         return occupancy

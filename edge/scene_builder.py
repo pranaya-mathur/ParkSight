@@ -20,15 +20,36 @@ class SceneBuilder:
         self.camera.start()
         logger.info("Initializing Scene Builder...")
 
+    def _detect_hazards(self, detections: list, occupancy: list):
+        """Rule-based anomaly detection for hazards and violations."""
+        hazards = []
+        
+        # 1. Overstay Violation (> 60s for demo)
+        for slot in occupancy:
+            if slot["status"] == "occupied" and slot.get("occupancy_duration", 0) > 60:
+                hazards.append(f"Overstay Violation: Slot {slot['id']}")
+        
+        # 2. Obstacle Detection (Pedestrians/Bicycles in car slots)
+        for det in detections:
+            if det["label"] in ["person", "bicycle"]:
+                hazards.append(f"Safety Hazard: {det['label']} detected in parking area")
+            if det["label"] == "fire hydrant":
+                hazards.append("Infrastructure: Fire Hydrant Detected")
+                
+        # 3. Double Parking (Very basic check - overlapping detections)
+        if len(detections) > len([s for s in occupancy if s["status"] == "occupied"]):
+            hazards.append("Potential Double Parking Detected")
+            
+        return list(set(hazards)) # Deduplicate
+
     def build_scene(self):
         """Builds a complete snapshot of the parking lot."""
         frame = self.camera.get_frame()
         detections = self.inference.run_inference(frame)
         occupancy = self.engine.update_occupancy(detections)
         
-        # Simulated hazards/incidents for the policy engine & LLM
-        possible_hazards = ["Oil Leak", "Unauthorized Access", "Double Parked", "Blocked Fire Hydrant"]
-        hazards = random.choices(possible_hazards, k=random.randint(0, 1)) if random.random() > 0.8 else []
+        # Rule-based hazards instead of pure randomization
+        hazards = self._detect_hazards(detections, occupancy)
         
         # Calculate Guidance
         target_slot = occupancy[0] if occupancy else None
@@ -43,7 +64,7 @@ class SceneBuilder:
             "slots": occupancy,
             "hazards": hazards,
             "guidance": guidance,
-            "confidence": 0.95 # Mock aggregate confidence
+            "confidence": 0.98 if detections else 0.5 
         }
         
         logger.info(f"Built Scene at {frame['timestamp']} with {len(occupancy)} slots.")
