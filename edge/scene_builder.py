@@ -14,14 +14,14 @@ logger = logging.getLogger("scene-builder")
 class SceneBuilder:
     """Multi-Camera Orchestrator: Aggregates scenes and identities from multiple sensors."""
     
-    def __init__(self, camera_configs: List[dict] = None):
+    def __init__(self, camera_configs: List[dict] = None, engine: SlotEngine = None):
         # Default to a single mock camera if none provided
         if not camera_configs:
             camera_configs = [{"id": "CAM-01", "source": "MOCK"}]
             
         self.cameras = [CameraService(source=cfg["source"], camera_id=cfg["id"]) for cfg in camera_configs]
         self.inference = CVInference()
-        self.engine = SlotEngine()
+        self.engine = engine or SlotEngine()
         self.guidance_engine = GuidanceEngine()
         self.identity_engine = IdentityEngine()
         

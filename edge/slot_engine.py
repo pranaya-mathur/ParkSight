@@ -59,7 +59,7 @@ class SlotEngine:
             config = json.load(f)
         return cls(slots=config["slots"], homography_matrix=config.get("homography"))
 
-    def update_occupancy(self, detections: list, reserved_slots: set = None, iou_threshold: float = 0.3):
+    def update_occupancy(self, detections: list, reserved_slots: set = None, iou_threshold: float = 0.15):
         """Calculates occupancy after perspective correction and Reservation sync."""
         occupancy = []
         occupied_slots = set()

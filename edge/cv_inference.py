@@ -35,7 +35,7 @@ class CVInference:
         if img is None:
             return self._fetch_simulated_detections()
             
-        results = self.model.predict(img, imgsz=640, conf=0.25, verbose=False)
+        results = self.model.predict(img, imgsz=1280, conf=0.10, verbose=False)
         
         detections = []
         for r in results:

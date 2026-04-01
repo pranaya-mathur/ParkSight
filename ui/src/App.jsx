@@ -52,16 +52,18 @@ const App = () => {
   const SpatialView = ({ slots, guidance }) => (
     <div className="relative glass mb-8 aspect-video overflow-hidden border-indigo-500/30">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" />
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+      <svg viewBox="0 0 1920 1080" className="absolute inset-0 w-full h-full drop-shadow-[0_0_15px_rgba(99,102,241,0.2)]">
         {/* Render Slot Geometries */}
         {slots?.map(slot => (
            <polygon
              key={slot.id}
              points={slot.polygon_points?.map(p => `${p[0]},${p[1]}`).join(' ')}
-             className={`transition-all duration-700 fill-current ${
-               slot.id === guidance?.best_slot ? 'text-primary/40 stroke-primary stroke-[0.5]' : 
-               slot.status === 'occupied' ? 'text-danger/20 stroke-danger/30 stroke-[0.2]' : 'text-slate-800/40 stroke-slate-700/50 stroke-[0.1]'
-             }`}
+             fill={slot.id === guidance?.best_slot ? 'rgba(99,102,241,0.5)' : 
+                   slot.status === 'occupied' ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.15)'}
+             stroke={slot.id === guidance?.best_slot ? '#6366f1' : 
+                     slot.status === 'occupied' ? '#ef4444' : '#6366f1'}
+             strokeWidth={slot.id === guidance?.best_slot ? '3' : '1.5'}
+             style={{transition: 'all 0.7s ease'}}
            />
         ))}
 

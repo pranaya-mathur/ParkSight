@@ -11,11 +11,21 @@ from .notifications import NotificationService
 from .analytics_service import AnalyticsService
 from .predictor_service import PredictorService
 from brain.graph import build_graph
+from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables once
 load_dotenv()
 
 app = FastAPI(title="ParkSight API - Production")
+
+# 0. Configure CORS for frontend stability
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize shared components
 policy_engine = PolicyEngine()
@@ -48,12 +58,12 @@ def health():
 async def process_scene(scene: Scene):
     """Core guidance endpoint: policy checks, telemetry logs, and LLM explanation."""
     
-    # 1. Identify best slot (deterministic)
-    free = [s for s in scene.slots if s.get("status") == "free"]
-    if free:
-        best_slot = sorted(free, key=lambda x: x.get("distance", 999))[0]["id"]
+    # 1. Initialize State
+    result = {}
+    explanation = "System Operational: Analyzing scene..."
+    best_slot = -1
     
-    # 2. Evaluate Policies (Deterministic Engine)
+    # 2. Identify best slot (deterministic)
     violations = policy_engine.evaluate_scene(scene.model_dump())
     
     # 3. Cognitive Brain (LangGraph + Groq)
@@ -96,7 +106,9 @@ async def process_scene(scene: Scene):
         }
 
     # 4. Automated Ticketing Integration (Always Run)
-    active_violations = result.get("violations", []) if 'result' in locals() else violations
+    # Ensure active_violations uses AI results if available, otherwise deterministic fallback
+    active_violations = result.get("violations", violations)
+    
     for v in active_violations:
         if v.get("should_ticket"):
             # Find vehicle_id for this slot
@@ -150,13 +162,13 @@ def get_violations(camera_id: Optional[str] = None):
     analyzer = AnalyticsService(history)
     return analyzer.get_violation_report()
 
-@app.get("/api/analytics/forecast")
+@app.get("/analytics/forecast")
 def get_forecast(camera_id: Optional[str] = None):
     """Generates a 60-minute occupancy forecast."""
     predictor = PredictorService(telemetry)
     return predictor.get_occupancy_forecast(camera_id=camera_id)
 
-@app.post("/api/reserve")
+@app.post("/reserve")
 async def reserve_slot(request: ReservationRequest):
     """Creates a 30-minute reservation for a specific slot."""
     import datetime
@@ -175,7 +187,7 @@ async def reserve_slot(request: ReservationRequest):
     session.close()
     return {"status": "reserved", "slot_id": request.slot_id}
 
-@app.get("/api/vehicles/{vehicle_id}/guidance")
+@app.get("/vehicles/{vehicle_id}/guidance")
 def get_driver_guidance(vehicle_id: str):
     """Personalized guidance for a specific recognized driver."""
     # Check for active reservations
@@ -200,7 +212,7 @@ def get_driver_guidance(vehicle_id: str):
         "target_slot": -1
     }
 
-@app.get("/api/reservations/active")
+@app.get("/reservations/active")
 def get_active_reservations():
     """Fetches all active slot reservations for Edge node synchronization."""
     session = telemetry.Session()
@@ -210,7 +222,7 @@ def get_active_reservations():
     session.close()
     return out
 
-@app.get("/api/revenue/summary")
+@app.get("/revenue/summary")
 def get_revenue_summary():
     """Summarizes facility-wide earnings and tickets."""
     session = telemetry.Session()
@@ -226,7 +238,7 @@ def get_revenue_summary():
         "currency": "INR"
     }
 
-@app.get("/api/revenue/tickets")
+@app.get("/revenue/tickets")
 def get_all_tickets():
     """Returns a log of all violation tickets."""
     session = telemetry.Session()

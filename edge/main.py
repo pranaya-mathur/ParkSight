@@ -31,14 +31,13 @@ def run_edge_node():
     camera = CameraService(source=source)
     detector = CVInference()
     identity_engine = IdentityEngine()
-    scene_builder = SceneBuilder()
     
+    # Initialize multi-camera orchestrator with the correct SlotEngine
     logger.info("🚀 ParkSight Edge Node Starting...")
+    sb = SceneBuilder(camera_configs=CAMERA_CONFIGS, engine=slot_engine)
+    
     if not camera.start():
         return
-    
-    # Initialize multi-camera orchestrator
-    sb = SceneBuilder(camera_configs=CAMERA_CONFIGS)
     
     while True:
         try:

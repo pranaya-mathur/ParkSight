@@ -13,15 +13,11 @@ ParkSight AI is a commercial-grade, edge-first intelligent parking management su
 ## 🏛️ Enterprise Analytics Gallery
 Experience the full depth of the V4.0 Monetization & Enforcement suite through these high-fidelity module walkthroughs.
 
-### 1. Spatial Control Hero
-The primary orchestrator view combining 3D isometric mapping with real-time slot tenancy.
-![Spatial Control Hero](assets/hero_dashboard.png)
-
-### 2. Revenue & Monetization Hub
+### 1. Revenue & Monetization Hub
 Live financial tracking with surge-aware multipliers, occupancy vs. revenue trendlines, and currency-localized earnings.
 ![Revenue Analytics](assets/revenue_analytics.png)
 
-### 3. Automated Enforcement Hub
+### 2. Automated Enforcement Hub
 The deterministic policy engine in action: tracking active E-Challans, resolving violation identities, and automating session settlements.
 ![Violation Hub](assets/violation_hub.png)
 
