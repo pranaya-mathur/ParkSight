@@ -1,35 +1,29 @@
 import os
-import sys
 from ultralytics import YOLO
 
-def download_yolo_weights(model_name="yolo26n.pt"):
-    """Downloads the real YOLO weights for the ParkSight Edge Perception."""
+def download_yolo_models():
+    """Download official YOLO11 and YOLOv5 models for detection.
+    YOLO11 is preferred for high-accuracy and NMS-free performance.
+    """
+    models = ["yolo11n.pt", "yolov8n.pt"] # Support both for fallback
     
-    print(f"📡 Initializing download for {model_name}...")
-    
-    # Path to the edge directory
-    target_dir = os.path.join(os.path.dirname(__file__), "edge")
+    target_dir = os.path.join(os.getcwd(), "edge")
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
-
-    target_path = os.path.join(target_dir, model_name)
+        
+    print(f"📦 Downloading models to {target_dir}...")
     
-    try:
-        # This will download the model to the current directory and then we move it
-        model = YOLO(model_name)
-        print(f"✅ Successfully downloaded {model_name}")
-        
-        # Verify the model can be loaded
-        print(f"🔎 Validating model architecture...")
-        print(model.info())
-        
-        print(f"📦 Model ready at {target_path}")
-        
-    except Exception as e:
-        print(f"❌ Error downloading model: {str(e)}")
-        print("💡 Tip: Ensure you have an active internet connection and 'ultralytics' installed.")
+    for model_name in models:
+        model_path = os.path.join(target_dir, model_name)
+        if not os.path.exists(model_path):
+            print(f"⬇️ Downloading {model_name}...")
+            model = YOLO(model_name) # This triggers an auto-download from Ultralytics
+            # Weights are usually in root, let's move them if they aren't where we want
+            if os.path.exists(model_name):
+                os.rename(model_name, model_path)
+            print(f"✅ {model_name} ready.")
+        else:
+            print(f"✅ {model_name} already exists.")
 
 if __name__ == "__main__":
-    # You can specify a different model name if needed, e.g., 'yolov8n.pt'
-    model = sys.argv[1] if len(sys.argv) > 1 else "yolo26n.pt"
-    download_yolo_weights(model)
+    download_yolo_models()

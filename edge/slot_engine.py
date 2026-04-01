@@ -1,51 +1,67 @@
 import logging
+import numpy as np
 from shapely.geometry import Polygon, box
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("slot-engine")
 
-class SlotEngine:
-    """Advanced Slot occupancy detection engine using Shapely Polygons.
-    Supports complex perspective-transformed parking slots.
-    """
+class HomographyTransformer:
+    """Corrects camera perspective using a 3x3 homography matrix."""
     
-    def __init__(self, num_slots: int = 10):
-        # Define 10 slots as Polygons (4 coordinates each) 
-        # to handle camera perspective/slanting.
+    def __init__(self, matrix=None):
+        # Default Identity Matrix (no change)
+        self.H = np.array(matrix) if matrix else np.eye(3)
+
+    def transform_point(self, x, y):
+        """Applies homography to a single (x, y) point."""
+        point = np.array([x, y, 1.0]).reshape(3, 1)
+        new_point = self.H @ point
+        new_point /= new_point[2] # Normalize (z-axis)
+        return float(new_point[0]), float(new_point[1])
+
+    def transform_bbox(self, bbox):
+        """Transforms a bounding box [x1, y1, x2, y2]."""
+        x1, y1 = self.transform_point(bbox[0], bbox[1])
+        x2, y2 = self.transform_point(bbox[2], bbox[3])
+        return [x1, y1, x2, y2]
+
+class SlotEngine:
+    """Advanced Slot occupancy detection engine with Homography support."""
+    
+    def __init__(self, num_slots: int = 10, homography_matrix=None):
+        self.transformer = HomographyTransformer(homography_matrix)
         self.slots = []
         for i in range(num_slots):
             x_start = i * 10
             x_end = x_start + 10
-            # Define a slightly trapezoidal slot to simulate perspective
+            # Slot Polygon (Defined in real-world / top-down space)
             poly = Polygon([
-                (x_start + 1, 25), # Top Left
-                (x_end - 1, 25),   # Top Right
-                (x_end, 45),       # Bottom Right
-                (x_start, 45)      # Bottom Left
+                (x_start + 0.5, 20), (x_end - 0.5, 20),
+                (x_end, 40), (x_start, 40)
             ])
             self.slots.append({
                 "id": i,
                 "polygon": poly,
                 "distance": round(i * 5.2, 1)
             })
-        logger.info(f"Initialized Advanced SlotEngine with {num_slots} polygons.")
+        logger.info(f"Initialized SlotEngine with Homography support (3x3 Matrix).")
 
     def update_occupancy(self, detections: list, iou_threshold: float = 0.3):
-        """Calculates occupancy based on Intersection over Area (IoA)."""
+        """Calculates occupancy after perspective correction."""
         occupancy = []
         occupied_slots = set()
         
         for det in detections:
-            bbox = det["bbox"] # [x1, y1, x2, y2]
-            det_poly = box(bbox[0], bbox[1], bbox[2], bbox[3])
+            bbox = det["bbox"] 
+            # 1. Transform detector bbox to Slot coordinate space
+            tx1, ty1, tx2, ty2 = self.transformer.transform_bbox(bbox)
+            det_poly = box(tx1, ty1, tx2, ty2)
             
             for slot in self.slots:
                 slot_poly = slot["polygon"]
-                # Calculate Intersection over Slot Area
                 if slot_poly.intersects(det_poly):
                     intersection_area = slot_poly.intersection(det_poly).area
                     ioa = intersection_area / slot_poly.area
-                    
                     if ioa >= iou_threshold:
                         occupied_slots.add(slot["id"])
                     
@@ -57,11 +73,11 @@ class SlotEngine:
                 "distance": slot["distance"]
             })
             
-        logger.debug(f"Polygon Occupancy Map: {occupancy}")
         return occupancy
 
 if __name__ == "__main__":
-    se = SlotEngine()
-    # Test collision with a slanting polygon
-    test_det = [{"label": "car", "bbox": [2, 30, 8, 40]}] # Mostly overlaps Slot 0
+    # Test with tilted matrix simulating 30% perspective shift
+    tilt_H = [[1.2, 0.1, 0], [0.1, 1.1, 0], [0, 0, 1]]
+    se = SlotEngine(homography_matrix=tilt_H)
+    test_det = [{"label": "car", "bbox": [5, 30, 25, 50]}]
     print(se.update_occupancy(test_det))

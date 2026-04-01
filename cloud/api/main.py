@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from .policy_engine import PolicyEngine
 from .telemetry import TelemetrySystem
 from .reports import ReportGenerator
+from .notifications import NotificationService
+from .analytics_service import AnalyticsService
 from langgraph.graph import StateGraph
 
 # Load environment variables (GROQ_API_KEY, etc.)
@@ -20,6 +22,7 @@ app = FastAPI(title="ParkSight API - Production")
 # Initialize shared components
 policy_engine = PolicyEngine()
 telemetry = TelemetrySystem()
+notifier = NotificationService()
 # graph = build_graph() # Note: Requires active GROQ_API_KEY
 graph = None # Initialized on demand or in startup
 
@@ -70,9 +73,18 @@ async def process_scene(scene: Scene):
                 "scene": scene.dict(),
                 "violations": violations,
                 "explanation": "",
-                "best_slot": best_slot
+                "best_slot": best_slot,
+                "classification": "STANDARD" # Initial
             })
             explanation = result["explanation"]
+            
+            # Trigger Real Notifications for Urgent events
+            if result.get("classification") == "URGENT":
+                notifier.send_alert(
+                    "🚨 URGENT PARKING ALERT",
+                    explanation,
+                    severity="High"
+                )
         except Exception as e:
             explanation = f"AI Service error: {str(e)}"
     else:
@@ -102,6 +114,12 @@ def generate_report():
     """Generates a utilization report from telemetry history."""
     report_gen = ReportGenerator(telemetry.history)
     return report_gen.generate_utilization_report()
+
+@app.get("/analytics/heatmap")
+def get_heatmap():
+    """Generates an occupancy heatmap from telemetry history."""
+    analyzer = AnalyticsService(telemetry.history)
+    return analyzer.get_occupancy_heatmap()
 
 if __name__ == "__main__":
     import uvicorn

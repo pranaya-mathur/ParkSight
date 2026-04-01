@@ -6,30 +6,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cv-inference")
 
 class CVInference:
-    """Production-ready CV Inference using real Ultralytics YOLO models."""
+    """Production-ready CV Inference using YOLOv11 for high performance."""
     
-    def __init__(self, model_name: str = "yolo26n.pt"):
+    def __init__(self, model_name: str = "yolo11n.pt"):
         # Look for model in the current edge directory
         model_path = os.path.join(os.path.dirname(__file__), model_name)
         
         try:
-            # Initialize with real YOLO weights
+            # Initialize with YOLOv11 weights (NMS-free, anchor-free)
             self.model = YOLO(model_path)
-            logger.info(f"✅ Initialized YOLO model: {model_name}")
+            logger.info(f"✅ Initialized YOLOv11 model: {model_name}")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to load real model weights ({model_name}). Falling back to simulation. Error: {e}")
-            self.model = None
+            logger.warning(f"⚠️ Failed to load YOLOv11 weights ({model_name}). Falling back to YOLOv8. Error: {e}")
+            try:
+                self.model = YOLO("yolov8n.pt")
+            except:
+                self.model = None
 
     def run_inference(self, frame_data: dict):
-        """Runs the actual YOLO inference on a frame."""
+        """Runs the actual YOLO11 inference on a frame."""
         if not frame_data:
             return []
             
-        # If no real model is loaded, fallback to simulation
         if not self.model:
             return self._fetch_simulated_detections()
         
-        # Real Inference (Requires numpy 'data' from camera_service)
         img = frame_data.get("data")
         if img is None:
             return self._fetch_simulated_detections()
@@ -40,13 +41,12 @@ class CVInference:
         for r in results:
             boxes = r.boxes
             for box in boxes:
-                # Get coordinates
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 label = self.model.names[int(box.cls[0])]
                 conf = float(box.conf[0])
                 
-                # Filter for vehicles (car, truck, bus, motorcycle)
-                if label in ["car", "truck", "bus", "motorcycle"]:
+                # Optimized filtering for parking scenarios
+                if label in ["car", "truck", "bus", "motorcycle", "person", "stop sign"]:
                     detections.append({
                         "label": label,
                         "confidence": conf,
@@ -59,7 +59,7 @@ class CVInference:
         """High-quality simulated detections for local development."""
         import random
         detections = []
-        num_vehicles = random.randint(4, 7)
+        num_vehicles = random.randint(3, 8)
         for _ in range(num_vehicles):
             slot_id = random.randint(0, 9)
             x_base = slot_id * 10

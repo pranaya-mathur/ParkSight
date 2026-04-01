@@ -13,6 +13,7 @@ class PlanState(TypedDict):
     violations: List[dict]
     best_slot: int
     classification: Literal["STANDARD", "URGENT"]
+    guidance: dict
 
 def build_graph():
     """Builds a LangGraph orchestrator with Conditional Routing for parking alerts."""
@@ -39,8 +40,26 @@ def build_graph():
     def standard_explainer(state: PlanState):
         """Standard guidance explainer."""
         scene = state["scene"]
-        system_msg = SystemMessage(content="You are ParkSight AI. Be polite and helpful.")
-        user_msg = HumanMessage(content=f"Scene: {scene}\nExplain the current status for the driver.")
+        violations = state["violations"]
+        free_slots = scene.get("slots", [])
+        
+        system_msg = SystemMessage(content=(
+            "You are ParkSight AI, an intelligent parking guidance system. "
+            "Explain the current parking situation concisely to the user. "
+            "Provide natural language steering guidance if a target slot is identified."
+            "Address any safety hazards or policy violations immediately."
+        ))
+        
+        guidance = scene.get("guidance", {})
+        guidance_text = f"Guidance: {guidance.get('instruction', 'None')}. Distance: {guidance.get('distance', 0)}m." if guidance else ""
+
+        user_msg = HumanMessage(content=(
+            f"Scene Data: {scene}\n"
+            f"Violations: {violations}\n"
+            f"Free Slots: {free_slots}\n"
+            f"{guidance_text}\n"
+            "Please provide a 2-sentence explanation of the status including steering advice."
+        ))
         response = llm.invoke([system_msg, user_msg])
         state["explanation"] = response.content
         return state
@@ -48,9 +67,9 @@ def build_graph():
     def urgent_alerter(state: PlanState):
         """Urgent alert generator for safety issues."""
         scene = state["scene"]
-        violations = state["violations"]
+        guidance = scene.get("guidance", {})
         system_msg = SystemMessage(content="You are ParkSight AI / EMERGENCY ALERT. Be direct and authoritative.")
-        user_msg = HumanMessage(content=f"DANGER: {scene.get('hazards')}\nExplain the IMMEDIATE actions required.")
+        user_msg = HumanMessage(content=f"DANGER: {scene.get('hazards')}\nGuidance: {guidance.get('instruction', 'Stop immediately')}\nExplain the IMMEDIATE actions required.")
         response = llm.invoke([system_msg, user_msg])
         state["explanation"] = f"CRITICAL: {response.content}"
         return state
