@@ -25,58 +25,61 @@ class PolicyEngine:
         logger.info("Initialized Policy Engine with enterprise rules.")
 
     def evaluate_scene(self, scene: dict):
-        """Checks the entire scene for policy violations."""
+        """Checks the entire scene for policy violations and ticketing triggers."""
         violations = []
+        slots = scene.get("slots", [])
         
-        # Check for slot-specific hazards first
+        # 1. Safety & Infrastructure Hazards
         if scene.get("hazards"):
             for hazard in scene["hazards"]:
                 violations.append({
                     "type": "Safety Incident",
                     "description": hazard,
-                    "severity": "High"
+                    "severity": "High",
+                    "should_ticket": False # Safety is an alert, not a fine
                 })
         
-        # Check slots for rule compliance
-        occupied_count = sum(1 for s in scene["slots"] if s["status"] == "occupied")
-        
-        # 1. Overcrowding Detection (e.g. > 80% capacity)
-        if occupied_count / len(scene["slots"]) > 0.8:
+        # 2. Overcrowding Detection
+        occupied_count = sum(1 for s in slots if s.get("status") == "occupied")
+        if len(slots) > 0 and (occupied_count / len(slots)) > 0.8:
             violations.append({
                 "type": "Usage Anomaly",
                 "description": "Parking lot is reaching critical capacity (Overcrowding).",
-                "severity": "Medium"
+                "severity": "Medium",
+                "should_ticket": False
             })
             
-        for i, slot in enumerate(scene["slots"]):
+        # 3. Deterministic Slot Violations
+        for slot in slots:
             slot_id = slot["id"]
-            status = slot["status"]
+            status = slot.get("status")
+            duration = slot.get("occupancy_duration", 0)
             
             if status == "occupied":
-                # 2. Potential Double Parking Detection
-                # (If two adjacent slots are occupied by the same 'large' vehicle detection)
-                # For this mock, we simulate it based on a random factor.
-                import random
-                if random.random() > 0.95:
+                # A. Overstay Policy (> 10 mins)
+                if duration > 600:
                     violations.append({
                         "type": "Policy Violation",
                         "slot_id": slot_id,
-                        "rule": "Single Slot Usage",
-                        "description": "Possible Double Parking detected.",
-                        "severity": "High"
+                        "rule": "Time Limit (600s)",
+                        "description": "Vehicle has exceeded the maximum stay duration.",
+                        "severity": "High",
+                        "should_ticket": duration > 900 # 5-min grace after limit
                     })
                 
+                # B. Restricted Zone Check
                 rule = self.rules.get(slot_id, "Standard")
                 if rule != "Standard":
-                    # Simulate a 10% chance of a violation for demo purposes
-                    import random
-                    if random.random() > 0.9:
+                    # Simulated: We check if the vehicle identity lacks authorization
+                    # For this V4.0 model, we flag it if it's there for > 30s
+                    if duration > 30:
                         violations.append({
                             "type": "Policy Violation",
                             "slot_id": slot_id,
                             "rule": rule,
-                            "description": f"Occupied without {rule} authorization.",
-                            "severity": "Medium"
+                            "description": f"Unauthorized occupancy in {rule} zone.",
+                            "severity": "High",
+                            "should_ticket": duration > 300 # 5-min grace period
                         })
                         
         logger.info(f"Evaluated scene: {len(violations)} violations found.")

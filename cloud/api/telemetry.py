@@ -25,6 +25,24 @@ class VehicleIdentity(Base):
     last_seen = Column(DateTime, default=datetime.datetime.utcnow)
     embedding = Column(Text) # JSON-serialized 512-dim vector
 
+class Reservation(Base):
+    __tablename__ = 'reservations'
+    id = Column(Integer, primary_key=True)
+    slot_id = Column(Integer)
+    vehicle_id = Column(String(50))
+    start_time = Column(DateTime, default=datetime.datetime.utcnow)
+    expiry_time = Column(DateTime)
+    status = Column(String(20), default="ACTIVE") # ACTIVE, EXPIRED, FULFILLED
+
+class Ticket(Base):
+    __tablename__ = 'tickets'
+    id = Column(Integer, primary_key=True)
+    vehicle_id = Column(String(50))
+    violation_type = Column(String(50))
+    amount = Column(Float)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String(20), default="UNPAID") # UNPAID, PAID, VOIDED
+
 class TelemetrySystem:
     """Enterprise-grade telemetry system with Vehicle Re-ID matching."""
     
@@ -130,6 +148,21 @@ class TelemetrySystem:
     def get_summary(self):
         """Returns the last 50 events."""
         return self.get_history(limit=50)
+
+    def create_ticket(self, vehicle_id: str, violation_type: str, amount: float = 500.0):
+        """Creates a persistent violation ticket (E-Challan)."""
+        session = self.Session()
+        from .telemetry import Ticket
+        ticket = Ticket(
+            vehicle_id=vehicle_id,
+            violation_type=violation_type,
+            amount=amount
+        )
+        session.add(ticket)
+        session.commit()
+        session.close()
+        self.logger.info(f"🎫 TICKET GENERATED: {violation_type} for {vehicle_id}")
+        return ticket
 
 if __name__ == "__main__":
     ts = TelemetrySystem()

@@ -33,11 +33,15 @@ class GuidanceEngine:
         if distance < 10:
             instruction = "Stop / Maneuver Complete"
             
-        # 3. Path generation (Points for UI visualization)
+        # 3. Grid-based Path generation (Aisles vs Slots)
+        # Entry point: bottom center (curr_x, curr_y)
+        # Aisle mid-point (Y=65)
+        # Slot approach (target_x, target_y)
         path = [
             {"x": curr_x, "y": curr_y},
-            {"x": curr_x, "y": target_y + (dy/2)}, # Intermediate point
-            {"x": target_x, "y": target_y}
+            {"x": curr_x, "y": 65},         # Primary Aisle
+            {"x": target_x, "y": 65},      # Move in Aisle to Slot Column
+            {"x": target_x, "y": target_y}  # Final Slot Approach
         ]
         
         return {

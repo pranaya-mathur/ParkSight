@@ -45,8 +45,8 @@ class SceneBuilder:
         # If a plate is missing or "blocked", we could flag it
         return list(set(hazards))
 
-    def build_scenes(self):
-        """Builds snapshots for ALL connected cameras with ALPR and Re-ID."""
+    def build_scenes(self, reserved_slots: set = None):
+        """Builds snapshots for ALL connected cameras with ALPR, Re-ID, and Reservations."""
         scenes = []
         for cam in self.cameras:
             try:
@@ -55,7 +55,7 @@ class SceneBuilder:
                     continue
                     
                 detections = self.inference.run_inference(frame)
-                occupancy = self.engine.update_occupancy(detections)
+                occupancy = self.engine.update_occupancy(detections, reserved_slots=reserved_slots)
                 
                 # Enrich occupancy with Identity (ALPR + Re-ID)
                 for slot in occupancy:

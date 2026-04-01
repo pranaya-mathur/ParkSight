@@ -9,6 +9,7 @@ logger = logging.getLogger("edge-main")
 
 # Configuration
 API_URL = os.getenv("API_URL", "http://localhost:8000/system/process")
+RESERVE_URL = os.getenv("RESERVE_URL", "http://localhost:8000/api/reservations/active")
 CAMERA_CONFIGS = [
     {"id": "CAM-01", "source": os.getenv("CAMERA_SOURCE", "MOCK")},
     {"id": "CAM-02", "source": os.getenv("CAMERA_SOURCE", "MOCK")}
@@ -23,10 +24,19 @@ def run_edge_node():
     
     while True:
         try:
-            # 1. Build scenes for all cameras (Inference + Identity + Guidance)
-            scenes = sb.build_scenes()
+            # 1. Fetch active reservations from Cloud
+            reserved_slots = set()
+            try:
+                res_resp = requests.get(RESERVE_URL, timeout=2)
+                if res_resp.status_code == 200:
+                    reserved_slots = {r["slot_id"] for r in res_resp.json()}
+            except:
+                logger.warning("🕒 Could not sync reservations (Offline Mode)")
+
+            # 2. Build scenes with Reservation awareness
+            scenes = sb.build_scenes(reserved_slots=reserved_slots)
             
-            # 2. Push each scene to Cloud API
+            # 3. Push each scene to Cloud API
             for scene in scenes:
                 response = requests.post(API_URL, json=scene, timeout=5)
                 if response.status_code == 200:

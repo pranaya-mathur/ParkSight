@@ -1,112 +1,117 @@
-# ParkSight AI: Enterprise Parking Guidance & Identity Partitioning
+# ParkSight AI: Enterprise Parking Monetization & Cognitive Guidance
 
-[![Production Ready](https://img.shields.io/badge/Status-V2.0--Identity--Live-green.svg)]()
-[![AI Powered](https://img.shields.io/badge/AI-YOLO11%20%2B%20LPRNet-blue.svg)]()
-[![Test Coverage](https://img.shields.io/badge/Tests-100%25%20Passing-emerald.svg)]()
+[![Production Ready](https://img.shields.io/badge/Status-V4.0--Revenue--Live-emerald.svg)]()
+[![AI Powered](https://img.shields.io/badge/AI-YOLO11%20%2B%20LangGraph-blue.svg)]()
+[![Revenue Ready](https://img.shields.io/badge/Monetization-Active--Surge-gold.svg)]()
 
-ParkSight AI is an enterprise-grade, edge-first intelligent parking guidance and identity orchestration system. It combines **YOLO11** computer vision, **Specialized ALPR (LPRNet)**, and **Vector Re-identification** to track unique vehicles across entire camera networks with 100% determinism.
+ParkSight AI is a commercial-grade, edge-first intelligent parking management suite. It evolves beyond simple monitoring into a **Revenue-Aware Orchestrator**, combining **YOLO11** computer vision, **Space-Aware Spatial Intelligence**, and **Cognitive Decision Brains** to automate facility monetization and driver guidance.
 
 ---
 
 ## 🏗️ System Architecture
 
 ### 1. High-Level Topology
-ParkSight uses an edge-orchestrator pattern with persistent identity registry.
+ParkSight uses a tiered edge-to-cloud architecture with a high-fidelity cognitive layer.
 
 ```mermaid
 graph TD
-    subgraph Edge ["Edge Node (Analysis)"]
-        Cam1[Camera 1] --> SB[Scene Builder]
-        Cam2[Camera 2] --> SB
+    subgraph Edge ["Edge Node (Computer Vision)"]
+        Cam[Cameras] --> SB[Scene Builder]
         SB --> IE[Identity Engine: ALPR + Re-ID]
-        IE --> SB
+        SB --> SE[Slot Engine: Polygon Analysis]
+        IE & SE --> SB
     end
 
-    subgraph Cloud ["Cloud Control (Identity Registry)"]
+    subgraph Cloud ["Cloud Core (Orchestrator)"]
         SB -- Telemetry --> API[FastAPI Gateway]
-        API --> DB[(parksight.db)]
-        DB --> VS[Vector Similarity Engine]
-        VS --> API
-        API --> BR[Brain: LangGraph]
+        API --> RS[Revenue Service: Dynamic Pricing]
+        API --> BR[Brain: LangGraph Reasoning]
+        BR --> AE[Enforcement: Auto-Ticketing]
+        RS & BR & AE --> DB[(Postgres/SQL)]
     end
 
-    subgraph Frontend ["Control Center"]
-        BR -- Natural Guidance --> UI[React Dashboard]
-        DB -- Historical Trends --> UI
+    subgraph Control_Center ["Enterprise Dashboard"]
+        API -- Real-time Sync --> UI[React PWA]
+        UI -- AR Overlays --> User[Facility Manager]
     end
 ```
 
-### 2. Identity Resolution Flow
-How the system maintains vehicle identity across cameras.
+### 2. Revenue & Enforcement Flow
+How the system automates monetization and policy compliance.
 
 ```mermaid
 sequenceDiagram
     participant E as Edge Node
-    participant C as Cloud API
-    participant D as Identity DB
+    participant C as Cloud Logic
+    participant R as Revenue Engine
+    participant T as Ticketing
     
-    E->>E: Extract Vector Embedding (512-dim)
-    E->>C: POST /system/process (with Embedding)
-    C->>D: Search Vector Similarity (>0.9)
-    alt Match Found
-        D-->>C: Return Existing vehicle_id
-    else New Vehicle
-        D-->>C: Register New vehicle_id
+    E->>C: Push Scene (Vehicle identity + duration)
+    C->>R: Calculate Surge-Aware Rate
+    R-->>C: Current Pricing (₹100/hr * Surge)
+    alt Overstay Detected (>10m)
+        C->>T: Generate E-Challan (₹500)
+        T-->>C: Ticket #TK-XYZ Persisted
     end
-    C-->>E: Acknowledge Resolution
-    C-->>C: Update UI with persistent ID
+    C-->>E: Sync Pricing + Enforcement State
+    C-->>C: Update Revenue Dashboard
 ```
 
 ---
 
-## 🚀 Enterprise Features
+## 🚀 Key Modules
+
+### 💰 Revenue & Automation (V4.0)
+- **Dynamic Pricing Engine**: Occupancy-aware surge pricing (1.5x) and EV priority incentives.
+- **Automated Enforcement**: High-confidence e-challan generation for overstays and restricted zone violations with a 5-minute safety grace period.
+- **Fiscal Analytics**: Real-time earnings tracking, pending collections, and enforcement registry.
+
+### 📐 Spatial Intelligence (V3.0)
+- **AR-Style Overlays**: Neon-glowing polygon overlays for live slot status visualization.
+- **A* Pathfinding**: Realistic, aisle-aware navigation guidance for drivers.
+- **Signage Broadcast**: LLM-driven public announcements for safety hazards and facility-wide status.
 
 ### 🆔 Persistent Identity (V2.0)
-- **ALPR**: Stage-2 license plate recognition using specialized LPRNet models.
-- **Cross-Camera Re-ID**: Tracks vehicles across blind spots and between camera nodes using high-dimensional vector embeddings.
-- **Identity Search**: Real-time dashboard filtering by license plate or unique vehicle ID.
-
-### 📡 Multi-Camera Intelligence
-- **Scene Fusion**: Aggregates disparate camera perspectives into a unified facility-wide state.
-- **Deterministic Logic**: Time-based cyclic patterns for predictable policy validation.
-
-### 🧠 Explainable AI
-- **LangGraph Brain**: State-aware decision orchestration for safety-critical alerts vs. standard guidance.
+- **Specialized ALPR**: High-precision license plate recognition (LPRNet).
+- **Vector Re-ID**: Tracking vehicles across cameras using 512-dim visual embeddings.
+- **Identity Search**: Instant lookup by plate or unique vehicle ID.
 
 ---
 
-## 🚦 Getting Started
+## 🛠️ Technology Stack
+- **Vision**: YOLO11 (Detection) + Shapely (Geometry) + LPRNet (ALPR).
+- **Brain**: LangGraph (Decision Logic) + Groq (Llama-3.3-70b Reasoning).
+- **Backend**: FastAPI (Python) + SQLAlchemy (Persistence) + Pydantic.
+- **UI**: React 18 + Framer Motion (Animations) + Lucide Icons + Tailwind CSS.
 
-### 1. Installation
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
+---
+
+## 🚦 Quick Start
+
+### 1. Environment Configuration
+Create a `.env` file in the root directory:
+```env
+GROQ_API_KEY=your_key_here
+DATABASE_URL=sqlite:///./parksight.db
 ```
 
-### 2. Running Services
-Start the Cloud API first, then the Edge Orchestrator:
-
+### 2. Running the Suite
 ```bash
-# Terminal 1: Cloud API
+# Terminal 1: Launch the Monetized Cloud API
 python3 -m cloud.api.main
 
-# Terminal 2: Edge Node (Identity Orchestrator)
+# Terminal 2: Launch the Identity Edge Node
 python3 -m edge.main
-```
 
-### 3. Testing
-```bash
-# Run core logic tests
-pytest tests/
-
-# Run Re-ID persistence validation
-python3 tests/test_reid.py
+# Terminal 3: Launch the Control Center
+cd ui && npm run dev
 ```
 
 ---
 
-## 🗺️ Roadmap
-- [x] **V1.1**: Multi-camera, SQL Persistence, Proper Packaging.
-- [x] **V2.0 (Identity)**: ALPR & Cross-camera Re-ID (Latest).
-- [ ] **V3.0 (Spatial)**: AR Guidance & Dynamic UI Overlays.
+## 🗺️ Enterprise Roadmap
+- [x] **V2.0 (Identity)**: ALPR & Cross-camera Re-ID.
+- [x] **V3.0 (Spatial)**: AR Guidance & Signage Broadcast.
+- [x] **V3.5 (Predictive)**: Occupancy Forecasting & Reservations.
+- [x] **V4.0 (Monetization)**: Dynamic Pricing & Automated E-Challans.
+- [ ] **V5.0 (Global)**: Multi-site Cloud Clustering & Mobile Payments.

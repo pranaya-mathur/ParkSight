@@ -48,14 +48,13 @@ class SlotEngine:
         self.slot_timers = {} # Tracks {slot_id: start_timestamp}
         logger.info(f"Initialized SlotEngine with Homography and Overstay tracking.")
 
-    def update_occupancy(self, detections: list, iou_threshold: float = 0.3):
-        """Calculates occupancy after perspective correction."""
+    def update_occupancy(self, detections: list, reserved_slots: set = None, iou_threshold: float = 0.3):
+        """Calculates occupancy after perspective correction and Reservation sync."""
         occupancy = []
         occupied_slots = set()
         
         for det in detections:
             bbox = det["bbox"] 
-            # 1. Transform detector bbox to Slot coordinate space
             tx1, ty1, tx2, ty2 = self.transformer.transform_bbox(bbox)
             det_poly = box(tx1, ty1, tx2, ty2)
             
@@ -69,7 +68,9 @@ class SlotEngine:
                     
         for slot in self.slots:
             is_occupied = slot["id"] in occupied_slots
-            status = "occupied" if is_occupied else "free"
+            is_reserved = reserved_slots and slot["id"] in reserved_slots
+            
+            status = "occupied" if is_occupied else "reserved" if is_reserved else "free"
             
             # Timer management
             duration = 0
@@ -84,7 +85,8 @@ class SlotEngine:
                 "id": slot["id"],
                 "status": status,
                 "distance": slot["distance"],
-                "occupancy_duration": round(duration, 1)
+                "occupancy_duration": round(duration, 1),
+                "polygon_points": list(slot["polygon"].exterior.coords)
             })
             
         return occupancy

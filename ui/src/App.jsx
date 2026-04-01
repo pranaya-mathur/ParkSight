@@ -12,17 +12,89 @@ import {
   Settings,
   ChevronRight,
   Camera,
-  Timer
+  Timer,
+  Banknote,
+  Receipt,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const App = () => {
   const [view, setView] = useState('live');
+  const [selectedCamera, setSelectedCamera] = useState('CAM-01');
   const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState({ slots: [], hazards: [], summary: {} });
   const [stats, setStats] = useState(null);
   const [violations, setViolations] = useState([]);
+  const [revenueSummary, setRevenueSummary] = useState({ total_revenue: 0, pending_revenue: 0, active_tickets: 0 });
+  const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Signage Ticker Component
+  const AnnouncementTicker = ({ message }) => (
+    <div className="bg-primary/10 border-y border-primary/20 py-2 overflow-hidden whitespace-nowrap mb-6">
+      <motion.div 
+        animate={{ x: [1000, -1000] }}
+        transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+        className="inline-block"
+      >
+        <span className="text-xs font-black tracking-widest text-primary uppercase mr-20">
+          广播 BROADCAST: {message || "System Operational - Optimal Guidance Active"}
+        </span>
+        <span className="text-xs font-black tracking-widest text-primary uppercase mr-20">
+          PROCEED TO HIGHLIGHTED ZONE: {data.guidance?.best_slot !== undefined ? `SLOT #${data.guidance.best_slot}` : "SCANNING"}
+        </span>
+      </motion.div>
+    </div>
+  );
+
+  // Spatial AR Overlay Component
+  const SpatialView = ({ slots, guidance }) => (
+    <div className="relative glass mb-8 aspect-video overflow-hidden border-indigo-500/30">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" />
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+        {/* Render Slot Geometries */}
+        {slots?.map(slot => (
+           <polygon
+             key={slot.id}
+             points={slot.polygon_points?.map(p => `${p[0]},${p[1]}`).join(' ')}
+             className={`transition-all duration-700 fill-current ${
+               slot.id === guidance?.best_slot ? 'text-primary/40 stroke-primary stroke-[0.5]' : 
+               slot.status === 'occupied' ? 'text-danger/20 stroke-danger/30 stroke-[0.2]' : 'text-slate-800/40 stroke-slate-700/50 stroke-[0.1]'
+             }`}
+           />
+        ))}
+
+        {/* Render Guidance Path */}
+        {guidance?.path_points && (
+          <motion.path
+            d={`M ${guidance.path_points.map(p => `${p.x} ${p.y}`).join(' L ')}`}
+            fill="none"
+            stroke="url(#pathGradient)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeDasharray="4 2"
+            initial={{ strokeDashoffset: 100 }}
+            animate={{ strokeDashoffset: 0 }}
+            transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+            className="drop-shadow-[0_0_8px_#6366f1]"
+          />
+        )}
+        
+        <defs>
+          <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="100%" stopColor="#a855f7" />
+          </linearGradient>
+        </defs>
+      </svg>
+      
+      <div className="absolute top-4 left-4 glass px-3 py-1.5 border-primary/20 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+        <span className="text-[10px] font-black tracking-tighter uppercase">Spatial Perspective Active</span>
+      </div>
+    </div>
+  );
 
   // Filter slots based on search query
   const filteredSlots = data.slots?.filter(slot => 
@@ -35,10 +107,12 @@ const App = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [telRes, heatRes, violRes] = await Promise.all([
+        const [telRes, heatRes, violRes, revRes, tickRes] = await Promise.all([
           fetch(`/api/telemetry/summary?camera_id=${selectedCamera}`).then(r => r.json()),
           fetch(`/api/analytics/heatmap?camera_id=${selectedCamera}`).then(r => r.json()),
-          fetch(`/api/analytics/violations?camera_id=${selectedCamera}`).then(r => r.json())
+          fetch(`/api/analytics/violations?camera_id=${selectedCamera}`).then(r => r.json()),
+          fetch(`/api/revenue/summary`).then(r => r.json()),
+          fetch(`/api/revenue/tickets`).then(r => r.json())
         ]);
 
         if (telRes.length > 0) {
@@ -46,6 +120,8 @@ const App = () => {
         }
         setStats(heatRes);
         setViolations(violRes);
+        setRevenueSummary(revRes);
+        setTickets(tickRes);
       } catch (err) {
         console.error("Fetch error:", err);
       } finally {
@@ -81,6 +157,7 @@ const App = () => {
         <nav className="flex-1">
           <NavItem id="live" icon={LayoutDashboard} label="Live Map" />
           <NavItem id="analytics" icon={BarChart3} label="Analytics" />
+          <NavItem id="revenue" icon={Banknote} label="Revenue Control" />
           <NavItem id="violations" icon={History} label="Violation Log" />
         </nav>
 
@@ -135,23 +212,11 @@ const App = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              {/* Guidance Banner */}
-              <div className="glass p-6 mb-8 flex items-center gap-6 border-l-4 border-indigo-500">
-                <div className="p-3 bg-indigo-500/10 rounded-xl text-primary">
-                  <Navigation className="animate-pulse" size={28} />
-                </div>
-                <div className="flex-1">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">AI Orchestrator</span>
-                  <p className="text-lg font-medium">
-                    {data.guidance?.instruction || "Scanning parking geometry for optimal paths..."}
-                  </p>
-                </div>
-                {data.occupancy_duration > 0 && (
-                  <div className="flex flex-col items-end">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Time in Scene</span>
-                    <span className="text-xl font-mono text-primary">{Math.floor(data.occupancy_duration)}s</span>
-                  </div>
-                )}
+              {/* Spatial & Signage Layer */}
+              <AnnouncementTicker message={data.broadcast} />
+              
+              <div className="mb-10">
+                <SpatialView slots={data.slots} guidance={data.guidance} />
               </div>
 
               {/* Live Grid */}
@@ -269,6 +334,98 @@ const App = () => {
             </motion.div>
           )}
 
+          {view === 'revenue' && (
+            <motion.div 
+              key="revenue"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              {/* Financial Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass p-6 bg-gradient-to-br from-emerald-500/10 to-slate-900/50 border-emerald-500/20">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
+                      <Wallet size={24} />
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-400 uppercase">Live Earnings</span>
+                  </div>
+                  <h3 className="text-4xl font-black text-white">₹{revenueSummary.total_revenue}</h3>
+                  <p className="text-xs text-slate-500 mt-2 italic font-medium">Settled electronic transactions</p>
+                </div>
+                
+                <div className="glass p-6 bg-gradient-to-br from-indigo-500/10 to-slate-900/50 border-indigo-500/20">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                      <Receipt size={24} />
+                    </div>
+                    <span className="text-[10px] font-black text-indigo-400 uppercase">Pending Collection</span>
+                  </div>
+                  <h3 className="text-4xl font-black text-white">₹{revenueSummary.pending_revenue}</h3>
+                  <p className="text-xs text-slate-500 mt-2 italic font-medium">Active sessions & unpaid tickets</p>
+                </div>
+
+                <div className="glass p-6 bg-gradient-to-br from-danger/10 to-slate-900/50 border-danger/20">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-danger/20 rounded-lg text-danger">
+                      <ShieldAlert size={24} />
+                    </div>
+                    <span className="text-[10px] font-black text-danger uppercase">Enforcement</span>
+                  </div>
+                  <h3 className="text-4xl font-black text-white">{revenueSummary.active_tickets}</h3>
+                  <p className="text-xs text-slate-500 mt-2 italic font-medium">Active un-resolved tickets</p>
+                </div>
+              </div>
+
+              {/* Ticket Registry */}
+              <div className="glass p-8">
+                <h3 className="text-sm font-black tracking-widest uppercase mb-8 flex items-center gap-3">
+                  <Receipt className="text-primary" size={18} />
+                  Automated Enforcement Registry (E-Challans)
+                </h3>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[10px] font-black text-slate-500 uppercase border-b border-white/5">
+                        <th className="pb-4">Ticket ID</th>
+                        <th className="pb-4">Vehicle ID</th>
+                        <th className="pb-4">Violation Type</th>
+                        <th className="pb-4">Timestamp</th>
+                        <th className="pb-4">Fine Amount</th>
+                        <th className="pb-4 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {tickets.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="py-20 text-center text-slate-500 italic">No tickets generated in the current billing cycle.</td>
+                        </tr>
+                      ) : (
+                        tickets.map(ticket => (
+                          <tr key={ticket.id} className="text-xs group hover:bg-white/5 transition-all">
+                            <td className="py-4 font-mono text-slate-400">#TK-{ticket.id}</td>
+                            <td className="py-4 font-black">{ticket.vehicle_id}</td>
+                            <td className="py-4 text-danger font-bold uppercase tracking-tighter">{ticket.violation}</td>
+                            <td className="py-4 text-slate-500">{new Date(ticket.timestamp).toLocaleString()}</td>
+                            <td className="py-4 font-mono text-emerald-400">₹{ticket.amount}</td>
+                            <td className="py-4 text-right">
+                              <span className={`px-2 py-1 rounded text-[9px] font-black ${
+                                ticket.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-danger/20 text-danger'
+                              }`}>
+                                {ticket.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
           {view === 'violations' && (
             <motion.div 
               key="violations"

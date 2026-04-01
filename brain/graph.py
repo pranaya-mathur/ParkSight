@@ -14,6 +14,9 @@ class PlanState(TypedDict):
     best_slot: int
     classification: Literal["STANDARD", "URGENT"]
     guidance: dict
+    broadcast: str
+    revenue_data: dict
+    session_costs: List[dict]
 
 def build_graph():
     """Builds a LangGraph orchestrator with Conditional Routing for parking alerts."""
@@ -21,7 +24,7 @@ def build_graph():
     # Initialize Groq LLM
     llm = ChatGroq(
         temperature=0,
-        model_name="llama3-70b-8192", 
+        model_name="llama-3.3-70b-versatile", 
         groq_api_key=os.getenv("GROQ_API_KEY")
     )
 
@@ -87,10 +90,63 @@ def build_graph():
         state["explanation"] = f"🔴 ALERT: {response.content}"
         return state
 
+    def signage_broadcast(state: PlanState):
+        """Generates a 3-5 word public announcement for signage."""
+        explanation = state.get("explanation", "System Operational")
+        is_urgent = state.get("classification") == "URGENT"
+        
+        system_msg = SystemMessage(content=(
+            "You are a public address system. Summarize the status into a 3-5 word HIGH IMPACT announcement. "
+            "If URGENT, make it a warning. If STANDARD, make it a helpful guidance."
+        ))
+        
+        user_msg = HumanMessage(content=f"Status: {explanation}")
+        
+        # Use LLM for concise broadcast
+        try:
+            response = llm.invoke([system_msg, user_msg])
+            state["broadcast"] = response.content.strip().upper()
+        except:
+            state["broadcast"] = "PROCEED WITH CAUTION" if is_urgent else "WELCOME TO PARKSIGHT"
+            
+        return state
+
+    def revenue_analyst(state: PlanState):
+        """Calculates session costs and earnings for the scene."""
+        from cloud.api.revenue_service import RevenueService
+        rs = RevenueService()
+        
+        # Get occupancy % for surge calculation
+        slots = state["scene"].get("slots", [])
+        occ_count = sum(1 for s in slots if s.get("status") == "occupied")
+        occ_p = (occ_count / len(slots) * 100) if slots else 0
+        
+        # Current Rate Data
+        rev_data = rs.calculate_current_rate(occ_p)
+        state["revenue_data"] = rev_data
+        
+        # Calculate costs for active sessions
+        costs = []
+        for slot in slots:
+            if slot.get("status") == "occupied":
+                # Rate per second (approx)
+                rate_per_sec = rev_data["final_rate"] / 3600
+                duration = slot.get("occupancy_duration", 0)
+                costs.append({
+                    "slot_id": slot["id"],
+                    "cost": round(duration * rate_per_sec, 2),
+                    "vehicle_id": slot.get("vehicle_id", "Unknown")
+                })
+        
+        state["session_costs"] = costs
+        return state
+
     # Add nodes
     workflow.add_node("classify", classifier)
     workflow.add_node("explain_standard", standard_explainer)
     workflow.add_node("explain_urgent", urgent_alerter)
+    workflow.add_node("revenue", revenue_analyst)
+    workflow.add_node("broadcast", signage_broadcast)
 
     # Entry and routing
     workflow.set_entry_point("classify")
@@ -108,8 +164,10 @@ def build_graph():
         }
     )
 
-    workflow.add_edge("explain_standard", END)
-    workflow.add_edge("explain_urgent", END)
+    workflow.add_edge("explain_standard", "revenue")
+    workflow.add_edge("explain_urgent", "revenue")
+    workflow.add_edge("revenue", "broadcast")
+    workflow.add_edge("broadcast", END)
 
     return workflow.compile()
 
