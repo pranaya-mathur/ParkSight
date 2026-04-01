@@ -48,15 +48,16 @@ def health():
 async def process_scene(scene: Scene):
     """Core guidance endpoint: policy checks, telemetry logs, and LLM explanation."""
     
-    # 1. Log to telemetry
-    telemetry.log_event("Scene Update", scene.dict())
+    # 1. Identify best slot (deterministic)
+    free = [s for s in scene.slots if s.get("status") == "free"]
+    if free:
+        best_slot = sorted(free, key=lambda x: x.get("distance", 999))[0]["id"]
     
-    # 2. Policy evaluation
-    violations = policy_engine.evaluate_scene(scene.dict())
+    # 2. Evaluate Policies (Deterministic Engine)
+    violations = policy_engine.evaluate_scene(scene.model_dump())
     
-    # 3. LLM Orchestration (LangGraph)
-    explanation = "Deterministic fallback: Guidance active."
-    best_slot = -1
+    # 3. Cognitive Brain (LangGraph + Groq)
+    # Check for target identity and provide AI reasoning
     
     # Identify best slot (deterministic)
     free = [s for s in scene.slots if s.get("status") == "free"]
@@ -72,7 +73,7 @@ async def process_scene(scene: Scene):
                 graph = build_graph()
             
             result = graph.invoke({
-                "scene": scene.dict(),
+                "scene": scene.model_dump(),
                 "violations": violations,
                 "explanation": "",
                 "best_slot": best_slot,
@@ -104,15 +105,24 @@ async def process_scene(scene: Scene):
             if v_id:
                 telemetry.create_ticket(v_id, v["type"], amount=500.0)
 
+    # 5. Build Final Response
+    guidance_data = {
+        "message": explanation,
+        "broadcast": result.get("broadcast", "PROCEED WITH CAUTION"),
+        "revenue": result.get("revenue_data", {})
+    }
+    
+    # 6. Comprehensive Telemetry Log (Captures full processed state)
+    full_data = scene.model_dump()
+    full_data["guidance"] = guidance_data
+    full_data["violations"] = active_violations
+    telemetry.log_event("Scene Update (Identity Resolved)", full_data)
+
     return {
+        "camera_id": scene.camera_id,
         "status": "success",
-        "guidance": {
-            "message": explanation,
-            "best_slot": best_slot,
-            "violations": violations,
-            "broadcast": result.get("broadcast") if 'result' in locals() else "WELCOME TO PARKSIGHT",
-            "revenue": result.get("revenue_data") if 'result' in locals() else {"final_rate": 100, "currency": "INR"}
-        }
+        "guidance": guidance_data,
+        "violations": active_violations
     }
 
 @app.get("/telemetry/summary")

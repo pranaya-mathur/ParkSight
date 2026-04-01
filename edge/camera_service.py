@@ -47,8 +47,14 @@ class CameraService:
         
         ret, frame = self.cap.read()
         if not ret:
-            logger.warning("⚠️ Frame dropped from stream.")
-            return None
+            # Auto-Loop for local files
+            if self.source.endswith((".mp4", ".avi", ".mkv")):
+                logger.info("🔁 Reached end of video file. Looping...")
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self.cap.read()
+            else:
+                logger.warning("⚠️ Frame dropped from stream.")
+                return None
             
         return {
             "frame_id": int(time.time()),

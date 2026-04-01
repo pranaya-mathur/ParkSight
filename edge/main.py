@@ -3,6 +3,10 @@ import requests
 import os
 import logging
 from .scene_builder import SceneBuilder
+from .slot_engine import SlotEngine
+from .camera_service import CameraService
+from .cv_inference import CVInference
+from .identity_engine import IdentityEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("edge-main")
@@ -11,13 +15,27 @@ logger = logging.getLogger("edge-main")
 API_URL = os.getenv("API_URL", "http://localhost:8000/system/process")
 RESERVE_URL = os.getenv("RESERVE_URL", "http://localhost:8000/api/reservations/active")
 CAMERA_CONFIGS = [
-    {"id": "CAM-01", "source": os.getenv("CAMERA_SOURCE", "MOCK")},
-    {"id": "CAM-02", "source": os.getenv("CAMERA_SOURCE", "MOCK")}
+    {"id": "CAM-01", "source": os.getenv("CAMERA_SOURCE", "MOCK")}
 ]
 
 def run_edge_node():
     """Main loop for the Edge Node: Orchestrate and Push to Cloud."""
+    source = os.getenv("CAMERA_SOURCE", "MOCK")
+    config_path = "edge/configs/kaggle_config.json"
+    
+    if source.endswith(".mp4") and os.path.exists(config_path):
+        slot_engine = SlotEngine.from_config(config_path)
+    else:
+        slot_engine = SlotEngine()
+
+    camera = CameraService(source=source)
+    detector = CVInference()
+    identity_engine = IdentityEngine()
+    scene_builder = SceneBuilder()
+    
     logger.info("🚀 ParkSight Edge Node Starting...")
+    if not camera.start():
+        return
     
     # Initialize multi-camera orchestrator
     sb = SceneBuilder(camera_configs=CAMERA_CONFIGS)
@@ -47,8 +65,8 @@ def run_edge_node():
         except Exception as e:
             logger.error(f"❌ Edge Loop Error: {e}")
             
-        # 5-second interval for telemetry updates (Enterprise standard)
-        time.sleep(5)
+        # 15-second interval to respect Groq rate limits during deep analysis
+        time.sleep(15)
 
 if __name__ == "__main__":
     run_edge_node()

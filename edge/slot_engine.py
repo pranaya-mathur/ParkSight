@@ -29,24 +29,35 @@ class HomographyTransformer:
 class SlotEngine:
     """Advanced Slot occupancy detection engine with Homography support."""
     
-    def __init__(self, num_slots: int = 10, homography_matrix=None):
+    def __init__(self, slots: list = None, homography_matrix=None):
         self.transformer = HomographyTransformer(homography_matrix)
         self.slots = []
-        for i in range(num_slots):
-            x_start = i * 10
-            x_end = x_start + 10
-            # Slot Polygon (Defined in real-world / top-down space)
-            poly = Polygon([
-                (x_start + 0.5, 20), (x_end - 0.5, 20),
-                (x_end, 40), (x_start, 40)
-            ])
-            self.slots.append({
-                "id": i,
-                "polygon": poly,
-                "distance": round(i * 5.2, 1)
-            })
+        
+        if slots:
+            for s in slots:
+                self.slots.append({
+                    "id": s["id"],
+                    "polygon": Polygon(s["polygon"]),
+                    "distance": s["distance"]
+                })
+        else:
+            # Fallback to generic grid
+            for i in range(10):
+                x_start = i * 10
+                x_end = x_start + 10
+                poly = Polygon([(x_start, 20), (x_end, 20), (x_end, 40), (x_start, 40)])
+                self.slots.append({"id": i, "polygon": poly, "distance": i * 5.0})
+
         self.slot_timers = {} # Tracks {slot_id: start_timestamp}
-        logger.info(f"Initialized SlotEngine with Homography and Overstay tracking.")
+        logger.info(f"Initialized SlotEngine with {len(self.slots)} slots.")
+
+    @classmethod
+    def from_config(cls, config_path: str):
+        """Loads slot geometry and homography from a JSON file."""
+        import json
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        return cls(slots=config["slots"], homography_matrix=config.get("homography"))
 
     def update_occupancy(self, detections: list, reserved_slots: set = None, iou_threshold: float = 0.3):
         """Calculates occupancy after perspective correction and Reservation sync."""
