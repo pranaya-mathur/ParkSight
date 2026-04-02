@@ -21,10 +21,16 @@ class CameraService:
         if self.source == "MOCK":
             logger.info(f"💾 Starting MOCK camera for {self.camera_id}...")
         else:
-            logger.info(f"🔋 Connecting to RTSP/CSI Source: {self.source}...")
-            self.cap = cv2.VideoCapture(self.source)
+            # Resolve relative path if needed
+            if not os.path.isabs(self.source) and os.path.exists(os.path.join(os.getcwd(), self.source)):
+                abs_source = os.path.join(os.getcwd(), self.source)
+            else:
+                abs_source = self.source
+            
+            logger.info(f"🔋 Connecting to RTSP/CSI Source: {abs_source}...")
+            self.cap = cv2.VideoCapture(abs_source)
             if not self.cap.isOpened():
-                logger.error("🛑 Failed to open camera source!")
+                logger.error(f"🛑 Failed to open camera source: {abs_source}")
                 return False
         
         self.is_running = True
@@ -48,12 +54,14 @@ class CameraService:
         ret, frame = self.cap.read()
         if not ret:
             # Auto-Loop for local files
-            if self.source.endswith((".mp4", ".avi", ".mkv")):
-                logger.info("🔁 Reached end of video file. Looping...")
+            if self.source.lower().endswith((".mp4", ".avi", ".mkv", ".mov")):
+                logger.debug("🔁 Reached end of video file. Looping...")
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 ret, frame = self.cap.read()
+                if not ret: return None
             else:
                 logger.warning("⚠️ Frame dropped from stream.")
+                if self.cap: self.cap.release()
                 return None
             
         return {

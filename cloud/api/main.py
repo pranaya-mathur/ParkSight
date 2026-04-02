@@ -82,8 +82,18 @@ async def process_scene(scene: Scene):
             if not graph:
                 graph = build_graph()
             
+            # --- CRITICAL: Filter embeddings to avoid '413 Payload Too Large' ---
+            lightweight_slots = []
+            for s in scene.slots:
+                s_copy = s.copy()
+                s_copy.pop("embedding", None) # Embeddings are too large for LLM
+                lightweight_slots.append(s_copy)
+            
+            lightweight_scene = scene.model_dump()
+            lightweight_scene["slots"] = lightweight_slots
+            
             result = graph.invoke({
-                "scene": scene.model_dump(),
+                "scene": lightweight_scene,
                 "violations": violations,
                 "explanation": "",
                 "best_slot": best_slot,

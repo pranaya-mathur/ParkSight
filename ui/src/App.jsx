@@ -15,7 +15,10 @@ import {
   Timer,
   Banknote,
   Receipt,
-  Wallet
+  Wallet,
+  Cpu,
+  Zap,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -32,38 +35,78 @@ const App = () => {
 
   // Signage Ticker Component
   const AnnouncementTicker = ({ message }) => (
-    <div className="bg-primary/10 border-y border-primary/20 py-2 overflow-hidden whitespace-nowrap mb-6">
-      <motion.div 
-        animate={{ x: [1000, -1000] }}
-        transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
-        className="inline-block"
-      >
-        <span className="text-xs font-black tracking-widest text-primary uppercase mr-20">
-          广播 BROADCAST: {message || "System Operational - Optimal Guidance Active"}
-        </span>
-        <span className="text-xs font-black tracking-widest text-primary uppercase mr-20">
-          PROCEED TO HIGHLIGHTED ZONE: {data.guidance?.best_slot !== undefined ? `SLOT #${data.guidance.best_slot}` : "SCANNING"}
-        </span>
-      </motion.div>
+    <div className="glass px-6 py-3 mb-8 flex items-center gap-6 border-primary/20 overflow-hidden relative">
+      <div className="flex items-center gap-2 text-primary font-black text-[10px] uppercase tracking-[0.2em] whitespace-nowrap border-r border-primary/20 pr-6">
+        <Zap size={14} className="animate-pulse" />
+        Live Broadcast
+      </div>
+      <div className="flex-1 overflow-hidden whitespace-nowrap">
+        <motion.div 
+          animate={{ x: [1000, -1000] }}
+          transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
+          className="inline-block"
+        >
+          <span className="text-xs font-bold tracking-wider text-slate-300 uppercase mr-20">
+            {message || "System Neural Link Active - Optimal Guidance Pathfinding Operational"}
+          </span>
+          <span className="text-xs font-black tracking-widest text-primary uppercase mr-20">
+            PROCEED TO HIGHLIGHTED ZONE: {data.guidance?.best_slot !== undefined ? `SLOT #${data.guidance.best_slot}` : "INITIALIZING SEARCH"}
+          </span>
+        </motion.div>
+      </div>
+      <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#0f172a] to-transparent z-10" />
     </div>
   );
 
   // Spatial AR Overlay Component
   const SpatialView = ({ slots, guidance }) => (
-    <div className="relative glass mb-8 aspect-video overflow-hidden border-indigo-500/30">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" />
-      <svg viewBox="0 0 1920 1080" className="absolute inset-0 w-full h-full drop-shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+    <div className="spatial-container mb-10 aspect-video overflow-hidden group relative">
+      {/* Neural Matrix Background Layers */}
+      <div className="absolute inset-0 bg-[#020617]" />
+      <div className="grid-overlay opacity-20" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.1)_0%,transparent_70%)]" />
+      
+      {/* Dynamic Digital Twin Texture */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' /%3E%3C/svg%3E")' }} />
+      
+      <div className="scan-line" />
+      
+      {/* Viewport Meta */}
+      <div className="absolute top-6 left-6 z-20 flex flex-col gap-1">
+        <div className="flex items-center gap-2 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-primary/30">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+          <span className="text-[9px] font-black tracking-[0.15em] uppercase text-white">Spatial Matrix v4.0</span>
+        </div>
+        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest ml-1">Node: {selectedCamera} // Neural Sync: Active</span>
+      </div>
+
+      <svg viewBox="0 280 1920 600" className="absolute inset-0 w-full h-full drop-shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+        <defs>
+          <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--primary)" />
+            <stop offset="100%" stopColor="var(--secondary)" />
+          </linearGradient>
+        </defs>
+
         {/* Render Slot Geometries */}
         {slots?.map(slot => (
-           <polygon
+           <motion.polygon
              key={slot.id}
              points={slot.polygon_points?.map(p => `${p[0]},${p[1]}`).join(' ')}
-             fill={slot.id === guidance?.best_slot ? 'rgba(99,102,241,0.5)' : 
-                   slot.status === 'occupied' ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.15)'}
-             stroke={slot.id === guidance?.best_slot ? '#6366f1' : 
-                     slot.status === 'occupied' ? '#ef4444' : '#6366f1'}
-             strokeWidth={slot.id === guidance?.best_slot ? '3' : '1.5'}
-             style={{transition: 'all 0.7s ease'}}
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             fill={slot.id === guidance?.best_slot ? 'rgba(99, 102, 241, 0.4)' : 
+                   slot.status === 'occupied' ? 'rgba(244, 63, 94, 0.25)' : 'rgba(6, 182, 212, 0.08)'}
+             stroke={slot.id === guidance?.best_slot ? 'var(--primary)' : 
+                     slot.status === 'occupied' ? 'var(--danger)' : 'var(--accent)'}
+             strokeWidth={slot.id === guidance?.best_slot ? '6' : '3'}
+             strokeDasharray={slot.status === 'free' ? '10 5' : 'none'}
+             className={slot.id === guidance?.best_slot || slot.status === 'occupied' ? 'neon-path' : ''}
+             style={{ transition: 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}
            />
         ))}
 
@@ -73,27 +116,22 @@ const App = () => {
             d={`M ${guidance.path_points.map(p => `${p.x} ${p.y}`).join(' L ')}`}
             fill="none"
             stroke="url(#pathGradient)"
-            strokeWidth="1.5"
+            strokeWidth="4"
             strokeLinecap="round"
-            strokeDasharray="4 2"
-            initial={{ strokeDashoffset: 100 }}
+            strokeDasharray="12 8"
+            initial={{ strokeDashoffset: 200 }}
             animate={{ strokeDashoffset: 0 }}
-            transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
-            className="drop-shadow-[0_0_8px_#6366f1]"
+            transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+            filter="url(#neon-glow)"
           />
         )}
-        
-        <defs>
-          <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#a855f7" />
-          </linearGradient>
-        </defs>
       </svg>
       
-      <div className="absolute top-4 left-4 glass px-3 py-1.5 border-primary/20 flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-        <span className="text-[10px] font-black tracking-tighter uppercase">Spatial Perspective Active</span>
+      <div className="absolute bottom-6 right-6 flex items-center gap-4">
+        <div className="flex items-center gap-2 glass px-3 py-1.5 border-primary/20">
+          <Globe size={12} className="text-primary" />
+          <span className="text-[9px] font-bold text-slate-400">GEODESIC SYNC 1:1</span>
+        </div>
       </div>
     </div>
   );
@@ -132,7 +170,7 @@ const App = () => {
     };
 
     fetchAll();
-    const interval = setInterval(fetchAll, 5000);
+    const interval = setInterval(fetchAll, 3000);
     return () => clearInterval(interval);
   }, [selectedCamera]);
 
@@ -141,62 +179,77 @@ const App = () => {
       onClick={() => setView(id)}
       className={`nav-item ${view === id ? 'active' : ''}`}
     >
-      <Icon size={20} />
+      <Icon size={18} />
       <span>{label}</span>
-      {view === id && <motion.div layoutId="nav-pill" className="ml-auto w-1 h-4 bg-primary rounded-full" />}
+      {view === id && <motion.div layoutId="nav-pill" className="ml-auto w-1 h-5 bg-primary rounded-full shadow-[0_0_8px_var(--primary)]" />}
     </div>
   );
 
   return (
     <>
-      {/* Sidebar Navigation */}
       <aside className="sidebar">
-        <div className="flex items-center gap-3 px-2 mb-4">
-          <ShieldAlert className="text-primary" size={32} />
-          <h1 className="text-xl">ParkSight <span className="text-sm font-normal opacity-50">v2.0</span></h1>
+        <div className="flex items-center gap-3 px-3 mb-10">
+          <div className="p-2 bg-primary/10 rounded-xl border border-primary/20">
+            <ShieldAlert className="text-primary" size={24} />
+          </div>
+          <div>
+            <h1 className="text-lg">ParkSight</h1>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Spatial Intelligence</p>
+          </div>
         </div>
 
         <nav className="flex-1">
-          <NavItem id="live" icon={LayoutDashboard} label="Live Map" />
-          <NavItem id="analytics" icon={BarChart3} label="Analytics" />
-          <NavItem id="revenue" icon={Banknote} label="Revenue Control" />
-          <NavItem id="violations" icon={History} label="Violation Log" />
+          <NavItem id="live" icon={LayoutDashboard} label="Neural Live Map" />
+          <NavItem id="analytics" icon={BarChart3} label="Space Analytics" />
+          <NavItem id="revenue" icon={Banknote} label="Revenue Hub" />
+          <NavItem id="violations" icon={History} label="Enforcement Log" />
         </nav>
 
-        <div className="pt-4 border-t border-slate-800">
-          <NavItem id="settings" icon={Settings} label="System Config" />
+        <div className="pt-6 border-t border-white/5">
+          <NavItem id="settings" icon={Settings} label="Global Config" />
+          <div className="mt-4 glass p-4 border-primary/10">
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu size={12} className="text-accent" />
+              <span className="text-[10px] font-black uppercase text-slate-300">Edge Processing</span>
+            </div>
+            <div className="h-1 bg-slate-900 rounded-full overflow-hidden">
+              <motion.div 
+                animate={{ width: ['20%', '65%', '40%'] }}
+                transition={{ repeat: Infinity, duration: 5 }}
+                className="h-full bg-accent" 
+              />
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="main-content">
         <header className="flex justify-between items-center mb-10">
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold">{view === 'live' ? 'Identity Control' : view.toUpperCase()}</h2>
-            <div className="flex items-center gap-4 mt-1">
-               <p className="text-slate italic">AI-driven license plate & identity orchestration</p>
-               {view === 'live' && (
-                 <div className="relative group">
-                   <input 
-                     type="text" 
-                     placeholder="Search Plate / ID..." 
-                     value={searchQuery}
-                     onChange={(e) => setSearchQuery(e.target.value)}
-                     className="bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-1 text-xs focus:border-primary outline-none transition-all w-48"
-                   />
-                 </div>
-               )}
+          <div>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-1">
+              <Navigation size={12} />
+              Enterprise Console / {view}
             </div>
+            <h2 className="text-3xl font-black">{view === 'live' ? 'Spatial Viewport' : view.replace(/-/g, ' ').toUpperCase()}</h2>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-6">
+            <div className="relative">
+               <input 
+                 type="text" 
+                 placeholder="Search Vehicle ID..." 
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 className="bg-slate-950/50 border border-white/10 rounded-xl px-4 py-2 text-xs focus:border-primary outline-none transition-all w-64 backdrop-blur-md"
+               />
+            </div>
+            <div className="flex bg-slate-950/50 p-1 rounded-xl border border-white/10 backdrop-blur-md">
               {['CAM-01', 'CAM-02'].map(cam => (
                 <button
                   key={cam}
                   onClick={() => setSelectedCamera(cam)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedCamera === cam ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
+                  className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${
+                    selectedCamera === cam ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
                   {cam}
@@ -210,79 +263,120 @@ const App = () => {
           {view === 'live' && (
             <motion.div 
               key="live"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
             >
-              {/* Spatial & Signage Layer */}
               <AnnouncementTicker message={data.broadcast} />
               
-              <div className="mb-10">
-                <SpatialView slots={data.slots} guidance={data.guidance} />
+              <SpatialView slots={data.slots} guidance={data.guidance} />
+
+              {/* Metrics Panel */}
+              <div className="grid grid-cols-4 gap-4 mb-10">
+                <div className="glass p-4 border-primary/20 flex flex-col justify-center items-center relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 z-10">Total Sectors</span>
+                  <span className="text-3xl font-black text-white z-10">{data.slots?.length || 0}</span>
+                </div>
+                <div className="glass p-4 border-danger/20 flex flex-col justify-center items-center relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-danger/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-danger mb-1 z-10">Occupied</span>
+                  <span className="text-3xl font-black text-white z-10">{data.slots?.filter(s => s.status === 'occupied').length || 0}</span>
+                </div>
+                <div className="glass p-4 border-success/20 flex flex-col justify-center items-center relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-success/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-success mb-1 z-10">Available Flux</span>
+                  <span className="text-3xl font-black text-white z-10">{data.slots?.filter(s => s.status === 'free').length || 0}</span>
+                </div>
+                <div className="glass p-4 border-warning/20 flex flex-col justify-center items-center relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-warning/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-warning mb-1 z-10">Reserved Priority</span>
+                  <span className="text-3xl font-black text-white z-10">{data.slots?.filter(s => s.status === 'reserved').length || 0}</span>
+                </div>
               </div>
 
-              {/* Live Grid */}
               <div className="dashboard-grid">
                 {filteredSlots?.length === 0 ? (
-                  <div className="col-span-full py-20 text-center glass opacity-50">
-                    <p className="italic">No vehicles matching "{searchQuery}" found on this camera.</p>
+                  <div className="col-span-full py-24 text-center glass border-dashed border-white/5">
+                    <AlertTriangle size={32} className="mx-auto text-slate-700 mb-4" />
+                    <p className="text-slate-500 italic text-sm">No spatial signatures matching "{searchQuery}" detected.</p>
                   </div>
                 ) : (
                   filteredSlots?.map(slot => (
-                    <div key={slot.id} className={`glass glass-hover slot-card ${slot.id === data.guidance?.best_slot ? 'glass-active' : ''}`}>
-                      <div className="flex justify-between items-center mb-2">
-                         <div className="flex flex-col">
-                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Slot #{slot.id}</span>
-                           {slot.vehicle_id && (
-                             <motion.span 
-                               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                               className="text-[9px] text-primary font-mono font-bold"
-                             >
-                               {slot.vehicle_id}
-                             </motion.span>
-                           )}
+                    <motion.div 
+                      layout
+                      key={slot.id} 
+                      className={`glass glass-hover slot-card ${slot.id === data.guidance?.best_slot ? 'border-primary/50 bg-primary/5' : ''}`}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                         <div>
+                           <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Matrix Sector</span>
+                           <h4 className="text-xl font-black text-white">#SLOT-{slot.id}</h4>
                          </div>
-                         <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                           slot.status === 'occupied' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent'
+                         <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                           slot.status === 'occupied' ? 'bg-danger/10 text-danger border border-danger/20' : 'bg-success/10 text-success border border-success/20'
                          }`}>
                            {slot.status}
                          </div>
                       </div>
                       
-                      <div className="slot-visual relative overflow-hidden">
-                        {slot.status === 'occupied' && (
+                      <div className="slot-visual relative overflow-hidden group">
+                        {slot.status === 'occupied' ? (
                           <>
-                            <div className="duration-badge"><Timer size={10} className="inline mr-1" /> {Math.round(slot.occupancy_duration)}s</div>
-                            <Car className="text-white/10" size={64} />
+                            <div className="duration-badge bg-slate-950/80 backdrop-blur-sm">
+                              <Timer size={10} className="inline mr-1" /> {Math.round(slot.occupancy_duration)}s
+                            </div>
+                            <Car className="text-white/5 group-hover:text-white/10 transition-colors" size={80} />
                             
-                            {/* License Plate Tag */}
+                            {/* License Plate Identity Card */}
                             {slot.license_plate && (
                               <motion.div 
-                                initial={{ y: 20 }} animate={{ y: 0 }}
-                                className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white text-black px-2 py-0.5 rounded border-b-2 border-slate-400 shadow-xl"
+                                initial={{ y: 30 }} animate={{ y: 0 }}
+                                className="absolute bottom-3 left-3 right-3 bg-white text-black p-2 rounded-lg shadow-2xl flex items-center justify-between"
                               >
                                 <span className="text-[10px] font-black tracking-tight">{slot.license_plate}</span>
+                                <div className="px-1.5 py-0.5 bg-black/10 rounded text-[7px] font-black">RE-ID VERIFIED</div>
                               </motion.div>
                             )}
+                            {!slot.license_plate && (
+                              <div className="absolute bottom-3 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-warning animate-pulse" />
+                                <span className="text-[9px] font-bold text-warning">SCANNING IDENTITY...</span>
+                              </div>
+                            )}
                           </>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 opacity-30 group-hover:opacity-60 transition-opacity">
+                            <Zap size={32} />
+                            <span className="text-[8px] font-black uppercase tracking-widest">Available Flux</span>
+                          </div>
                         )}
+                        
                         {slot.id === data.guidance?.best_slot && slot.status === 'free' && (
                           <motion.div 
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            className="text-primary flex flex-col items-center gap-1"
+                            animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
+                            transition={{ repeat: Infinity, duration: 3 }}
+                            className="absolute inset-0 bg-primary/10 flex flex-col items-center justify-center gap-2 border-2 border-primary/40 rounded-xl"
                           >
-                            <CheckCircle2 size={32} />
-                            <span className="text-[10px] font-bold">RECOMMENDED</span>
+                            <div className="p-2 bg-primary rounded-full shadow-[0_0_20px_var(--primary)]">
+                              <CheckCircle2 size={24} className="text-white" />
+                            </div>
+                            <span className="text-[10px] font-black text-primary tracking-widest">RECOMMENDED</span>
                           </motion.div>
                         )}
                       </div>
                       
-                      <div className="flex justify-between text-[10px] font-bold text-slate-600 mt-2">
-                        <span>DIST: {slot.distance}m</span>
-                        <span>IDENTITY: {slot.license_plate ? 'VERIFIED' : 'SCANNING'}</span>
+                      <div className="flex justify-between items-center text-[10px] font-bold mt-4 pt-4 border-t border-white/5">
+                        <div className="flex flex-col">
+                           <span className="text-slate-600 uppercase text-[8px]">Distance</span>
+                           <span className="text-slate-300">{slot.distance}m</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                           <span className="text-slate-600 uppercase text-[8px]">Vehicle Hash</span>
+                           <span className="text-primary font-mono">{slot.vehicle_id ? slot.vehicle_id.substring(0,8) : 'N/A'}</span>
+                        </div>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -297,41 +391,70 @@ const App = () => {
               exit={{ opacity: 0, y: -20 }}
               className="grid grid-cols-1 md:grid-cols-2 gap-8"
             >
-              <div className="glass p-8">
-                <h3 className="mb-6 flex items-center gap-2"><Activity size={20} className="text-primary" /> Occupancy Heatmap</h3>
-                <div className="flex flex-col gap-4">
+              <div className="glass p-10">
+                <div className="flex items-center justify-between mb-10">
+                   <h3 className="flex items-center gap-3 font-bold uppercase tracking-widest text-sm">
+                     <Activity size={20} className="text-primary" /> Sector Load Heatmap
+                   </h3>
+                   <span className="text-[10px] font-black text-slate-500">REALTIME TELEMETRY</span>
+                </div>
+                <div className="space-y-6">
                   {stats?.slots?.map(s => (
-                    <div key={s.slot_id} className="flex items-center gap-4">
-                      <span className="w-12 text-xs font-bold text-slate-500">#{s.slot_id}</span>
-                      <div className="flex-1 h-3 bg-slate-900 rounded-full overflow-hidden">
+                    <div key={s.slot_id} className="group">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-xs font-black text-slate-400 group-hover:text-primary transition-colors">MATRIX SECTOR #{s.slot_id}</span>
+                        <span className="text-xs font-mono text-slate-200">{s.utilization_percent}%</span>
+                      </div>
+                      <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${s.utilization_percent}%` }}
-                          className={`h-full ${s.utilization_percent > 70 ? 'bg-danger' : s.utilization_percent > 30 ? 'bg-primary' : 'bg-slate-700'}`}
-                        />
+                          transition={{ duration: 1.5, ease: "easeOut" }}
+                          className={`h-full relative ${
+                            s.utilization_percent > 75 ? 'bg-danger' : 
+                            s.utilization_percent > 35 ? 'bg-primary' : 'bg-slate-700'
+                          }`}
+                        >
+                           <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                        </motion.div>
                       </div>
-                      <span className="text-xs font-mono">{s.utilization_percent}%</span>
                     </div>
                   ))}
                 </div>
               </div>
               
-              <div className="glass p-8 bg-gradient-to-br from-slate-900/50 to-indigo-900/10">
-                <h3 className="mb-6 flex items-center gap-2"><Timer size={20} className="text-primary" /> Peak Hour Insights</h3>
-                {stats?.error ? (
-                  <p className="text-slate">No telemetry data found for {selectedCamera}</p>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center p-4 rounded-xl bg-slate-900/40">
-                      <span className="text-slate italic font-medium">Average Load</span>
-                      <span className="text-2xl font-black text-primary">{Math.round((stats?.slots?.reduce((a,b)=>a+b.utilization_percent,0)/10) || 0)}%</span>
-                    </div>
-                    <div className="p-4 border-l-2 border-primary/20">
-                      <p className="text-xs text-slate uppercase font-bold mb-1 tracking-widest text-primary">Recommendation</p>
-                      <p className="text-sm">High utilization detected on center slots. Consider dynamic pricing or EV priority shifts.</p>
-                    </div>
-                  </div>
-                )}
+              <div className="glass p-10 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] -mr-32 -mt-32" />
+                <div>
+                   <h3 className="mb-10 flex items-center gap-3 font-bold uppercase tracking-widest text-sm">
+                     <Timer size={20} className="text-primary" /> Peak Prediction Engine
+                   </h3>
+                   {stats?.error ? (
+                     <div className="py-20 text-center opacity-30 italic">Syncing neural data...</div>
+                   ) : (
+                     <div className="space-y-8">
+                       <div className="flex justify-between items-center p-6 rounded-2xl bg-slate-950/60 border border-white/5">
+                         <div>
+                           <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Average Matrix Load</p>
+                           <p className="text-sm font-bold">Current System Saturation</p>
+                         </div>
+                         <span className="text-5xl font-black text-primary drop-shadow-[0_0_15px_var(--primary-glow)]">
+                           {Math.round((stats?.slots?.reduce((a,b)=>a+b.utilization_percent,0)/10) || 0)}%
+                         </span>
+                       </div>
+                       <div className="p-6 border-l-4 border-primary bg-primary/5 rounded-r-2xl">
+                         <p className="text-[10px] text-primary uppercase font-black mb-2 tracking-[0.2em]">Neural Recommendation</p>
+                         <p className="text-sm leading-relaxed text-slate-300">
+                           High spatial saturation detected in central sectors. Recommend dynamic slot reservation premiums and priority routing for EV fleet.
+                         </p>
+                       </div>
+                     </div>
+                   )}
+                </div>
+                <div className="mt-10 flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  <span>Logic Processor: ACTIVE</span>
+                  <span>v1.0.4-STABLE</span>
+                </div>
               </div>
             </motion.div>
           )}
@@ -339,82 +462,69 @@ const App = () => {
           {view === 'revenue' && (
             <motion.div 
               key="revenue"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
               className="space-y-8"
             >
-              {/* Financial Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass p-6 bg-gradient-to-br from-emerald-500/10 to-slate-900/50 border-emerald-500/20">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
-                      <Wallet size={24} />
+                {[
+                  { label: 'Settled Capital', val: `₹${revenueSummary.total_revenue}`, icon: Wallet, color: 'text-success', bg: 'bg-success/5', border: 'border-success/20' },
+                  { label: 'Floating Assets', val: `₹${revenueSummary.pending_revenue}`, icon: Receipt, color: 'text-primary', bg: 'bg-primary/5', border: 'border-primary/20' },
+                  { label: 'Risk Enforcement', val: revenueSummary.active_tickets, icon: ShieldAlert, color: 'text-danger', bg: 'bg-danger/5', border: 'border-danger/20' }
+                ].map((card, i) => (
+                  <div key={i} className={`glass p-8 ${card.bg} ${card.border} group hover:border-white/20 transition-all`}>
+                    <div className="flex justify-between items-start mb-6">
+                      <div className={`p-4 rounded-2xl ${card.bg.replace('/5', '/10')} ${card.color}`}>
+                        <card.icon size={28} />
+                      </div>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${card.color}`}>{card.label}</span>
                     </div>
-                    <span className="text-[10px] font-black text-emerald-400 uppercase">Live Earnings</span>
+                    <h3 className="text-5xl font-black text-white group-hover:scale-105 transition-transform origin-left">{card.val}</h3>
+                    <p className="text-[10px] text-slate-500 mt-4 italic font-bold uppercase tracking-widest">Global Settle: OK</p>
                   </div>
-                  <h3 className="text-4xl font-black text-white">₹{revenueSummary.total_revenue}</h3>
-                  <p className="text-xs text-slate-500 mt-2 italic font-medium">Settled electronic transactions</p>
-                </div>
-                
-                <div className="glass p-6 bg-gradient-to-br from-indigo-500/10 to-slate-900/50 border-indigo-500/20">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
-                      <Receipt size={24} />
-                    </div>
-                    <span className="text-[10px] font-black text-indigo-400 uppercase">Pending Collection</span>
-                  </div>
-                  <h3 className="text-4xl font-black text-white">₹{revenueSummary.pending_revenue}</h3>
-                  <p className="text-xs text-slate-500 mt-2 italic font-medium">Active sessions & unpaid tickets</p>
-                </div>
-
-                <div className="glass p-6 bg-gradient-to-br from-danger/10 to-slate-900/50 border-danger/20">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-danger/20 rounded-lg text-danger">
-                      <ShieldAlert size={24} />
-                    </div>
-                    <span className="text-[10px] font-black text-danger uppercase">Enforcement</span>
-                  </div>
-                  <h3 className="text-4xl font-black text-white">{revenueSummary.active_tickets}</h3>
-                  <p className="text-xs text-slate-500 mt-2 italic font-medium">Active un-resolved tickets</p>
-                </div>
+                ))}
               </div>
 
-              {/* Ticket Registry */}
-              <div className="glass p-8">
-                <h3 className="text-sm font-black tracking-widest uppercase mb-8 flex items-center gap-3">
-                  <Receipt className="text-primary" size={18} />
-                  Automated Enforcement Registry (E-Challans)
-                </h3>
+              <div className="glass p-10">
+                <div className="flex items-center justify-between mb-10">
+                  <h3 className="text-sm font-black tracking-[0.25em] uppercase flex items-center gap-3">
+                    <Receipt className="text-primary" size={20} /> Automated Ledger Enforcement
+                  </h3>
+                  <button className="px-5 py-2 rounded-full glass border-primary/20 text-[10px] font-black text-primary uppercase hover:bg-primary/10 transition-all">Export Report .PDF</button>
+                </div>
                 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
                     <thead>
-                      <tr className="text-[10px] font-black text-slate-500 uppercase border-b border-white/5">
-                        <th className="pb-4">Ticket ID</th>
-                        <th className="pb-4">Vehicle ID</th>
-                        <th className="pb-4">Violation Type</th>
-                        <th className="pb-4">Timestamp</th>
-                        <th className="pb-4">Fine Amount</th>
-                        <th className="pb-4 text-right">Status</th>
+                      <tr className="text-[10px] font-black text-slate-600 uppercase border-b border-white/5">
+                        <th className="pb-6">Ledger ID</th>
+                        <th className="pb-6">Signature</th>
+                        <th className="pb-6">Incident Type</th>
+                        <th className="pb-6">Global Sync</th>
+                        <th className="pb-6">Quantum Fine</th>
+                        <th className="pb-6 text-right">Settlement</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {tickets.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="py-20 text-center text-slate-500 italic">No tickets generated in the current billing cycle.</td>
+                          <td colSpan="6" className="py-24 text-center text-slate-600 italic">No automated enforcement incidents logged.</td>
                         </tr>
                       ) : (
                         tickets.map(ticket => (
                           <tr key={ticket.id} className="text-xs group hover:bg-white/5 transition-all">
-                            <td className="py-4 font-mono text-slate-400">#TK-{ticket.id}</td>
-                            <td className="py-4 font-black">{ticket.vehicle_id}</td>
-                            <td className="py-4 text-danger font-bold uppercase tracking-tighter">{ticket.violation}</td>
-                            <td className="py-4 text-slate-500">{new Date(ticket.timestamp).toLocaleString()}</td>
-                            <td className="py-4 font-mono text-emerald-400">₹{ticket.amount}</td>
-                            <td className="py-4 text-right">
-                              <span className={`px-2 py-1 rounded text-[9px] font-black ${
-                                ticket.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-danger/20 text-danger'
+                            <td className="py-5 font-mono text-slate-500">TX-{ticket.id}</td>
+                            <td className="py-5 font-black text-slate-200">{ticket.vehicle_id}</td>
+                            <td className="py-5">
+                               <span className="px-2 py-1 rounded bg-danger/10 text-danger text-[9px] font-black uppercase tracking-tight">
+                                 {ticket.violation}
+                               </span>
+                            </td>
+                            <td className="py-5 text-slate-500 font-medium">{new Date(ticket.timestamp).toLocaleString()}</td>
+                            <td className="py-5 font-black text-success">₹{ticket.amount}</td>
+                            <td className="py-5 text-right">
+                              <span className={`px-3 py-1.5 rounded-lg text-[9px] font-black tracking-widest ${
+                                ticket.status === 'PAID' ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
                               }`}>
                                 {ticket.status}
                               </span>
@@ -428,43 +538,56 @@ const App = () => {
               </div>
             </motion.div>
           )}
+
           {view === 'violations' && (
             <motion.div 
               key="violations"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              className="max-w-5xl mx-auto"
             >
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="flex items-center gap-2 text-rose-400 font-bold uppercase tracking-widest text-sm">
-                  <AlertTriangle size={18} /> Safety & Policy Incident Log
-                </h3>
-                <span className="glass px-3 py-1 text-[10px] font-bold border-rose-500/20 text-rose-400 uppercase">
-                  Reporting Node: {selectedCamera}
-                </span>
+              <div className="flex items-center justify-between mb-12">
+                <div>
+                  <h3 className="flex items-center gap-3 text-danger font-black uppercase tracking-[0.3em] text-sm mb-1">
+                    <AlertTriangle size={20} /> Neural Safety Core
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Active Incident Suppression Log</p>
+                </div>
+                <div className="glass px-5 py-2 border-danger/30 text-danger text-[10px] font-black uppercase tracking-widest bg-danger/5">
+                  Critical Monitoring Active
+                </div>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {violations?.total_incidents === 0 ? (
-                  <div className="glass p-20 text-center flex flex-col items-center gap-4">
-                    <CheckCircle2 size={48} className="text-accent opacity-20" />
-                    <p className="text-slate italic">All clear. No safety violations or overstays detected.</p>
+                  <div className="glass p-32 text-center flex flex-col items-center gap-6 border-dashed border-white/10">
+                    <div className="relative">
+                       <CheckCircle2 size={64} className="text-success opacity-20" />
+                       <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0, 0.5, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute inset-0 bg-success rounded-full blur-2xl" />
+                    </div>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">System Safety Integrity: 100%</p>
                   </div>
                 ) : (
                   Object.entries(violations?.breakdown || {}).map(([type, count], i) => (
-                    <div key={i} className="glass p-6 flex items-center gap-6 border-l-4 border-danger">
-                      <div className="p-3 bg-danger/10 rounded-xl text-danger">
-                        <AlertTriangle className="animate-pulse" size={24} />
+                    <motion.div 
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      key={i} 
+                      className="glass p-8 flex items-center gap-8 border-l-8 border-danger group hover:bg-danger/5 transition-all"
+                    >
+                      <div className="p-4 bg-danger/20 rounded-2xl text-danger shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+                        <AlertTriangle className="animate-pulse" size={32} />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-bold text-slate-200">{type}</h4>
-                        <p className="text-xs text-slate italic">Frequency detected: {count} instance(s) in last 500 samples</p>
+                        <div className="text-[10px] font-black text-danger uppercase tracking-[0.2em] mb-1">Risk Signature</div>
+                        <h4 className="text-xl font-black text-slate-100">{type}</h4>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Telemetry Occurrences: {count}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <button className="px-3 py-1.5 rounded-lg bg-danger text-white text-[10px] font-bold shadow-lg shadow-danger/20">RESOLVE</button>
-                        <button className="px-3 py-1.5 rounded-lg glass text-[10px] font-bold">DISMISS</button>
+                      <div className="flex gap-4">
+                        <button className="px-6 py-3 rounded-xl bg-danger text-white text-[10px] font-black tracking-widest shadow-xl shadow-danger/20 hover:scale-105 active:scale-95 transition-all">RESOLVE CORE</button>
+                        <button className="px-6 py-3 rounded-xl glass border-white/10 text-[10px] font-black tracking-widest hover:bg-white/5">ARCHIVE</button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -472,13 +595,23 @@ const App = () => {
           )}
         </AnimatePresence>
 
-        {/* Footer Persistence Indicator */}
-        <footer className="mt-auto pt-10 flex justify-between items-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-           <div className="flex items-center gap-2">
-             <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
-             <span>Telemetry Tunnel: {selectedCamera} @ REST v1.1</span>
+        <footer className="mt-20 py-10 border-t border-white/5 flex justify-between items-center text-[9px] text-slate-600 font-black uppercase tracking-[0.3em]">
+           <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2">
+               <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_var(--primary)]" />
+               <span>Telemetry Link: {selectedCamera} // 115200 BAUD</span>
+             </div>
+             <div className="w-1 h-3 bg-white/10" />
+             <div className="flex items-center gap-2">
+               <span className="text-success">ENCRYPTED</span>
+               <Globe size={10} />
+             </div>
            </div>
-           <div>SQL Persistence: ACTIVE (parksight.db)</div>
+           <div className="flex items-center gap-6">
+             <div>Neural Core v4.0.12</div>
+             <div className="text-slate-800">|</div>
+             <div>PERSISTENCE BLOCK: ACTIVE</div>
+           </div>
         </footer>
       </main>
     </>
