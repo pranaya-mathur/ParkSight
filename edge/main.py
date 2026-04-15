@@ -14,6 +14,14 @@ logger = logging.getLogger("edge-main")
 # Configuration
 API_URL = os.getenv("API_URL", "http://localhost:8000/system/process")
 RESERVE_URL = os.getenv("RESERVE_URL", "http://localhost:8000/reservations/active")
+
+
+def _cloud_headers():
+    """Bearer for JWT or PARKSIGHT_SERVICE_BEARER when API auth is enabled."""
+    t = os.getenv("PARKSIGHT_SERVICE_BEARER", "").strip()
+    if t:
+        return {"Authorization": f"Bearer {t}"}
+    return {}
 CAMERA_CONFIGS = [
     {"id": "CAM-01", "source": os.getenv("CAMERA_SOURCE", "MOCK")}
 ]
@@ -51,7 +59,7 @@ def run_edge_node():
             # 2. Fetch active reservations from Cloud
             reserved_slots = set()
             try:
-                res_resp = requests.get(RESERVE_URL, timeout=1)
+                res_resp = requests.get(RESERVE_URL, timeout=1, headers=_cloud_headers())
                 if res_resp.status_code == 200:
                     reserved_slots = {r["slot_id"] for r in res_resp.json()}
             except:
@@ -63,7 +71,7 @@ def run_edge_node():
             # 4. Push to Cloud API
             for scene in scenes:
                 try:
-                    response = requests.post(API_URL, json=scene, timeout=5)
+                    response = requests.post(API_URL, json=scene, timeout=5, headers=_cloud_headers())
                     if response.status_code == 200:
                         logger.info(f"✅ Telemetry Pushed: {scene['camera_id']} ({len(scene['slots'])} slots)")
                     else:

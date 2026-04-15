@@ -20,7 +20,8 @@ import {
   CreditCard,
   Cpu,
   Zap,
-  Globe
+  Globe,
+  Crosshair
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -45,6 +46,16 @@ const App = () => {
   const [sessionSlot, setSessionSlot] = useState('1');
   const [billingMsg, setBillingMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem('parksight_token') || '');
+  const [loginEmail, setLoginEmail] = useState('admin@parksight.local');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginMsg, setLoginMsg] = useState('');
+  const [calImageUrl, setCalImageUrl] = useState('');
+  const [calSlots, setCalSlots] = useState([]);
+  const [calDraft, setCalDraft] = useState([]);
+  const [calHomography, setCalHomography] = useState([[1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+  const [calCameraId, setCalCameraId] = useState('CAM-01');
+  const [calMsg, setCalMsg] = useState('');
 
   // Signage Ticker Component
   const AnnouncementTicker = ({ message }) => (
@@ -156,16 +167,23 @@ const App = () => {
     slot.vehicle_id?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const getAuthHeaders = () => {
+    const t = authToken || localStorage.getItem('parksight_token');
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
+  const apiFetch = (url, opts = {}) =>
+    fetch(url, { ...opts, headers: { ...getAuthHeaders(), ...(opts.headers || {}) } });
+
   // Fetch all data for the selected camera
   useEffect(() => {
     const fetchAll = async () => {
       try {
         const [telRes, heatRes, violRes, revRes, tickRes] = await Promise.all([
-          fetch(`/api/telemetry/summary?camera_id=${selectedCamera}`).then(r => r.json()),
-          fetch(`/api/analytics/heatmap?camera_id=${selectedCamera}`).then(r => r.json()),
-          fetch(`/api/analytics/violations?camera_id=${selectedCamera}`).then(r => r.json()),
-          fetch(`/api/revenue/summary`).then(r => r.json()),
-          fetch(`/api/revenue/tickets`).then(r => r.json())
+          apiFetch(`/api/telemetry/summary?camera_id=${selectedCamera}`).then(r => r.json()),
+          apiFetch(`/api/analytics/heatmap?camera_id=${selectedCamera}`).then(r => r.json()),
+          apiFetch(`/api/analytics/violations?camera_id=${selectedCamera}`).then(r => r.json()),
+          apiFetch(`/api/revenue/summary`).then(r => r.json()),
+          apiFetch(`/api/revenue/tickets`).then(r => r.json())
         ]);
 
         if (telRes.length > 0) {
@@ -193,14 +211,14 @@ const App = () => {
     fetchAll();
     const interval = setInterval(fetchAll, 3000);
     return () => clearInterval(interval);
-  }, [selectedCamera]);
+  }, [selectedCamera, authToken]);
 
   const refreshBilling = async () => {
     try {
       const [sum, inv, sess] = await Promise.all([
-        fetch('/api/billing/summary').then(r => r.json()),
-        fetch('/api/billing/invoices').then(r => r.json()),
-        fetch('/api/billing/sessions').then(r => r.json()),
+        apiFetch('/api/billing/summary').then(r => r.json()),
+        apiFetch('/api/billing/invoices').then(r => r.json()),
+        apiFetch('/api/billing/sessions').then(r => r.json()),
       ]);
       setBillingSummary(sum);
       setInvoices(inv);
@@ -218,14 +236,14 @@ const App = () => {
   }, [view]);
 
   const loadInvoiceDetail = async (id) => {
-    const r = await fetch(`/api/billing/invoices/${id}`);
+    const r = await apiFetch(`/api/billing/invoices/${id}`);
     if (r.ok) setInvoiceDetail(await r.json());
   };
 
   const submitPayment = async () => {
     if (!invoiceDetail || !payAmount) return;
     setBillingMsg('');
-    const r = await fetch(`/api/billing/invoices/${invoiceDetail.id}/payments`, {
+    const r = await apiFetch(`/api/billing/invoices/${invoiceDetail.id}/payments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -252,7 +270,7 @@ const App = () => {
       setBillingMsg('Enter ticket IDs (comma-separated)');
       return;
     }
-    const r = await fetch('/api/billing/invoices/from-tickets', {
+    const r = await apiFetch('/api/billing/invoices/from-tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticket_ids: ids }),
@@ -269,7 +287,7 @@ const App = () => {
 
   const startParkingSession = async () => {
     setBillingMsg('');
-    const r = await fetch('/api/billing/sessions/start', {
+    const r = await apiFetch('/api/billing/sessions/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -288,7 +306,7 @@ const App = () => {
 
   const closeParkingSession = async (sessionId) => {
     setBillingMsg('');
-    const r = await fetch(`/api/billing/sessions/${sessionId}/close`, {
+    const r = await apiFetch(`/api/billing/sessions/${sessionId}/close`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
@@ -300,6 +318,59 @@ const App = () => {
     }
     setInvoiceDetail(j);
     refreshBilling();
+  };
+
+  const submitLogin = async () => {
+    setLoginMsg('');
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setLoginMsg(typeof j.detail === 'string' ? j.detail : 'Login failed');
+      return;
+    }
+    localStorage.setItem('parksight_token', j.access_token);
+    setAuthToken(j.access_token);
+    setLoginMsg('Signed in');
+  };
+
+  const logout = () => {
+    localStorage.removeItem('parksight_token');
+    setAuthToken('');
+    setLoginMsg('');
+  };
+
+  const onCalImgClick = (e) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const scaleX = el.naturalWidth / rect.width || 1;
+    const scaleY = el.naturalHeight / rect.height || 1;
+    const x = Math.round((e.clientX - rect.left) * scaleX);
+    const y = Math.round((e.clientY - rect.top) * scaleY);
+    setCalDraft((d) => [...d, [x, y]]);
+  };
+
+  const saveCalibration = async () => {
+    setCalMsg('');
+    const body = {
+      camera_id: calCameraId,
+      homography: calHomography,
+      slots: calSlots.map((s) => ({
+        id: s.id,
+        polygon: s.polygon,
+        distance: s.distance ?? s.id + 1,
+      })),
+    };
+    const r = await apiFetch('/api/calibration/slot-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    setCalMsg(!r.ok ? (typeof j.detail === 'string' ? j.detail : 'Save failed') : `Saved (${j.path || 'ok'})`);
   };
 
   const NavItem = ({ id, icon: Icon, label }) => (
@@ -332,6 +403,7 @@ const App = () => {
           <NavItem id="revenue" icon={Banknote} label="Revenue Hub" />
           <NavItem id="billing" icon={FileText} label="Billing & AR" />
           <NavItem id="violations" icon={History} label="Enforcement Log" />
+          <NavItem id="calibration" icon={Crosshair} label="Calibration" />
         </nav>
 
         <div className="pt-6 border-t border-white/5">
@@ -883,6 +955,64 @@ const App = () => {
                     </>
                   )}
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'settings' && (
+            <motion.div key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto glass p-8 border border-white/10">
+              <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-6">API sign-in</h3>
+              <p className="text-xs text-slate-500 mb-6">When <code className="text-primary">PARKSIGHT_REQUIRE_AUTH=1</code>, paste a JWT here or sign in as the seeded admin (defaults in README).</p>
+              <div className="space-y-4">
+                <input className="w-full bg-slate-950/80 border border-white/10 rounded-lg px-3 py-2 text-sm" placeholder="Email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+                <input type="password" className="w-full bg-slate-950/80 border border-white/10 rounded-lg px-3 py-2 text-sm" placeholder="Password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+                <div className="flex gap-3">
+                  <button type="button" onClick={submitLogin} className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-black uppercase">Sign in</button>
+                  <button type="button" onClick={logout} className="px-4 py-2 rounded-lg border border-white/10 text-xs font-bold">Clear token</button>
+                </div>
+                {loginMsg && <p className="text-xs text-slate-400">{loginMsg}</p>}
+                {authToken && <p className="text-[10px] text-slate-600 break-all">Bearer stored ({authToken.slice(0, 24)}…)</p>}
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'calibration' && (
+            <motion.div key="calibration" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-8">
+              <div className="glass p-6 border border-white/10">
+                <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-2">Slot calibration wizard</h3>
+                <p className="text-xs text-slate-500 mb-4">Upload a reference frame, click to trace each slot polygon, then add the slot. Requires admin JWT when auth is enabled.</p>
+                <input type="file" accept="image/*" className="text-xs mb-4" onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setCalImageUrl(URL.createObjectURL(f));
+                }} />
+                <div className="relative inline-block max-w-full border border-white/10 rounded-lg overflow-hidden bg-slate-950">
+                  {calImageUrl && (
+                    <img src={calImageUrl} alt="calibration" className="max-h-[480px] w-auto cursor-crosshair" onClick={onCalImgClick} />
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2">Draft points: {calDraft.length} — click image to add corners along one slot outline.</p>
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <button type="button" className="px-3 py-2 rounded-lg bg-slate-800 text-xs font-bold" onClick={() => setCalDraft([])}>Clear draft</button>
+                  <button type="button" className="px-3 py-2 rounded-lg bg-primary text-white text-xs font-black uppercase" onClick={() => {
+                    if (calDraft.length < 3) { setCalMsg('Need at least 3 points'); return; }
+                    const id = calSlots.length;
+                    setCalSlots((s) => [...s, { id, polygon: [...calDraft], distance: id + 1 }]);
+                    setCalDraft([]);
+                    setCalMsg(`Slot ${id} added`);
+                  }}>Add slot from draft</button>
+                </div>
+                <div className="mt-6 grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-bold text-slate-400">Camera ID
+                    <input className="mt-1 w-full bg-slate-950/80 border border-white/10 rounded-lg px-3 py-2 text-sm" value={calCameraId} onChange={(e) => setCalCameraId(e.target.value)} />
+                  </label>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-4">Homography defaults to identity; use API <code className="text-primary">POST /calibration/homography</code> for four-point warp then paste JSON here if needed.</p>
+                <pre className="text-[10px] bg-slate-950 p-3 rounded-lg overflow-auto max-h-32 mt-2">{JSON.stringify(calHomography)}</pre>
+                <div className="flex gap-2 mt-4">
+                  <button type="button" onClick={saveCalibration} className="px-4 py-2 rounded-lg bg-success text-slate-950 text-xs font-black uppercase">Save to edge config</button>
+                </div>
+                {calMsg && <p className="text-xs mt-3 text-slate-400">{calMsg}</p>}
+                <p className="text-[10px] text-slate-600 mt-4">Slots queued: {calSlots.length}</p>
               </div>
             </motion.div>
           )}

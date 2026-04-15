@@ -4,6 +4,7 @@
 # Core API & Web
 fastapi
 uvicorn
+python-multipart
 pydantic
 python-dotenv
 requests
@@ -28,3 +29,8 @@ onnxruntime
 # Development & Testing
 pytest
 httpx
+passlib
+python-jose[cryptography]
+prometheus-fastapi-instrumentator
+prometheus-client
+sentry-sdk

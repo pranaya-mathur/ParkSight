@@ -11,6 +11,7 @@ requires-python = ">=3.9"
 dependencies = [
     "fastapi",
     "uvicorn",
+    "python-multipart",
     "pydantic",
     "sqlalchemy",
     "psycopg2-binary",
@@ -23,7 +24,12 @@ dependencies = [
     "langchain-groq",
     "python-dotenv",
     "httpx",
-    "pytest"
+    "pytest",
+    "passlib",
+    "python-jose[cryptography]",
+    "prometheus-fastapi-instrumentator",
+    "prometheus-client",
+    "sentry-sdk",
 ]
 
 [tool.setuptools.packages.find]

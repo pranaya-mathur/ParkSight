@@ -152,6 +152,14 @@ Create a **`.env`** at the repository root (Compose reads it for substitution) o
 | `PARKSIGHT_IDENTITY_MODE` | `auto` (default), `onnx`, `torch`, or `simulated`. See identity table above. |
 | `PARKSIGHT_IDENTITY_IMAGENET` | `1` to use pretrained ImageNet weights for ResNet18 (torch path only). |
 | `ALPR_EASYOCR` | `1` to attempt EasyOCR on the torch path (extra dependency). |
+| `PARKSIGHT_REQUIRE_AUTH` | `1` to require `Authorization: Bearer <JWT>` (or `PARKSIGHT_SERVICE_BEARER`) on all routes except `/health`, `/metrics`, `/docs`, `/auth/token`, `/auth/login`. Default **off** for local DX. |
+| `PARKSIGHT_JWT_SECRET` | **Required** when `PARKSIGHT_REQUIRE_AUTH=1`. HS256 signing key. |
+| `PARKSIGHT_SERVICE_BEARER` | Optional static bearer for the **edge** service (same value in `edge` + `api` Compose env). Operators use `/auth/login` from the UI. |
+| `PARKSIGHT_ADMIN_EMAIL` / `PARKSIGHT_ADMIN_PASSWORD` | Seed the first **admin** user when `api_users` is empty (defaults in `cloud/api/security.py`). |
+| `PARKSIGHT_OPERATOR_EMAIL` / `PARKSIGHT_OPERATOR_PASSWORD` | Optional second user with **operator** role. |
+| `PARKSIGHT_CALIBRATION_PATH` | Where `POST /calibration/slot-config` writes JSON (default `edge/configs/kaggle_config.json`). |
+| `PARKSIGHT_CORS_ORIGINS` | Comma-separated origins for CORS (default `*`). |
+| `SENTRY_DSN` | Optional Sentry SDK initialization on API startup. |
 
 ---
 
@@ -217,7 +225,7 @@ docker compose up --build
 | `ui` | 3000 | Static build + **`/api` → API** via `docker/nginx-ui.conf` |
 | `edge` | — | `python -m edge.main`; image installs the full edge stack (**first build can be lengthy** due to PyTorch / Ultralytics). |
 
-**Volumes:** `parksight-telemetry` (API telemetry dir), **`parksight-models`** → `/app/edge/models` (persist ONNX weights across rebuilds). Populate models inside the volume or copy from a host run of `download_models.py`.
+**Volumes:** `parksight-telemetry` (API telemetry dir), **`parksight-models`** → `/app/edge/models` (persist ONNX weights across rebuilds), **`./edge/configs:/app/edge/configs`** on the API service so the **calibration wizard** can write `kaggle_config.json` where the edge container reads it.
 
 ```bash
 CAMERA_SOURCE=MOCK docker compose up
@@ -255,8 +263,37 @@ cd ui && npm ci && npm run build
 | Revenue | `GET /revenue/summary`, `GET /revenue/tickets` |
 | Reservations | `POST /reserve`, `GET /reservations/active` |
 | Billing | `GET /billing/summary`, `GET/POST /billing/invoices`, payments, sessions |
+| Auth | `POST /auth/token`, `POST /auth/login`, `GET /auth/me` |
+| Calibration | `POST /calibration/homography`, `POST /calibration/slot-config`, `GET /calibration/slot-config` |
+| Observability | `GET /metrics`, `POST /monitoring/heartbeat`, `GET /monitoring/edge-status` |
 
 Refer to `cloud/api/main.py` for the authoritative route list and request bodies.
+
+---
+
+## Security, calibration, and observability (MVP polish)
+
+### API authentication (JWT + roles)
+
+- **OAuth2 password** compatibility: `POST /auth/token` (form `username` / `password`) or **`POST /auth/login`** JSON `{ "email", "password" }`.
+- **JWT** includes `sub` (email) and `role` (`admin` | `operator`). **`POST /billing/invoices/{id}/void`** requires **admin**.
+- Enable with **`PARKSIGHT_REQUIRE_AUTH=1`** and set **`PARKSIGHT_JWT_SECRET`**. Edge nodes should set **`PARKSIGHT_SERVICE_BEARER`** to the same opaque string on API and edge so `POST /system/process` and `GET /reservations/active` succeed without interactive login.
+- The React dashboard stores the bearer in **`localStorage`** (`parksight_token`) after sign-in under **Global Config**.
+
+### Slot calibration wizard (UI)
+
+- **Calibration** view: upload a reference frame, click to outline each slot polygon, set **camera id**, then **Save to edge config** (calls `POST /calibration/slot-config`, **admin** when auth is on).
+- **Homography**: optional `POST /calibration/homography` with four source and four destination points (numpy DLT); result can be pasted or applied before save.
+
+### Metrics and Sentry
+
+- **`GET /metrics`** — Prometheus exposition (via `prometheus-fastapi-instrumentator` when installed).
+- **`POST /monitoring/heartbeat`** — edge / process liveness and optional **fps** (Prometheus gauges); requires the same auth as the rest of the API when `PARKSIGHT_REQUIRE_AUTH=1`.
+- **`SENTRY_DSN`** — optional error reporting on startup.
+
+### Open-source license
+
+Application source in this repository is licensed under the **Apache License 2.0** (see **`LICENSE`**). Third-party ONNX weights are subject to their upstream licenses (`download_models.py` URLs).
 
 ---
 
@@ -267,10 +304,11 @@ Refer to `cloud/api/main.py` for the authoritative route list and request bodies
 - [x] Predictive & reservations: forecasting and reservation endpoints.
 - [x] Monetization: dynamic pricing and enforcement ticketing.
 - [x] Billing & AR: invoices, payments, parking sessions, dashboard hooks.
+- [x] **MVP polish (phase 1):** JWT auth + roles, calibration API + UI wizard, Prometheus `/metrics`, Sentry hook, edge service bearer, Apache-2.0 license.
 - [ ] Multi-site clustering, mobile payments, and deeper payment-provider integrations (V5+).
 
 ---
 
-## License and third-party weights
+## Third-party model weights
 
 ONNX sample weights are downloaded from public GitHub repositories (see URLs in `download_models.py`). Verify license terms for your deployment before redistributing weights or derived models.

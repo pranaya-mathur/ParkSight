@@ -4,6 +4,7 @@ import datetime
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 import numpy as np
 
@@ -87,6 +88,16 @@ class InvoiceLine(Base):
     parking_session_id = Column(Integer, ForeignKey("parking_sessions.id"), nullable=True)
 
 
+class APIUser(Base):
+    """Dashboard / API auth (JWT). Distinct from vehicle identities."""
+    __tablename__ = "api_users"
+    id = Column(Integer, primary_key=True)
+    email = Column(String(120), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(32), nullable=False, default="operator")  # operator | admin
+    is_active = Column(Integer, default=1)  # 1 = active
+
+
 class Payment(Base):
     __tablename__ = "billing_payments"
     id = Column(Integer, primary_key=True)
@@ -103,7 +114,11 @@ class TelemetrySystem:
     
     def __init__(self):
         self.db_url = os.getenv("DATABASE_URL", "sqlite:///./parksight.db")
-        self.engine = create_engine(self.db_url)
+        eng_kw = {}
+        if self.db_url.startswith("sqlite") and ":memory:" in self.db_url:
+            eng_kw["connect_args"] = {"check_same_thread": False}
+            eng_kw["poolclass"] = StaticPool
+        self.engine = create_engine(self.db_url, **eng_kw)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         logging.basicConfig(level=logging.INFO)

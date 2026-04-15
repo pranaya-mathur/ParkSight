@@ -1,42 +1,103 @@
 import datetime
 import os
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import func
-from dotenv import load_dotenv
-from .policy_engine import PolicyEngine
-from .telemetry import TelemetrySystem
-from .reports import ReportGenerator
-from .notifications import NotificationService
-from .analytics_service import AnalyticsService
-from .predictor_service import PredictorService
-from .billing_service import BillingService
-from brain.graph import build_graph
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
-# Load environment variables once
+from brain.graph import build_graph
+
+from .analytics_service import AnalyticsService
+from .auth_routes import router as auth_router
+from .billing_service import BillingService
+from .calibration_routes import router as calibration_router
+from .monitoring import init_sentry, router as monitoring_router
+from .notifications import NotificationService
+from .policy_engine import PolicyEngine
+from .predictor_service import PredictorService
+from .reports import ReportGenerator
+from .security import bootstrap_users, require_admin
+from .telemetry import TelemetrySystem
+
 load_dotenv()
 
-app = FastAPI(title="ParkSight API - Production")
-
-# 0. Configure CORS for frontend stability
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Initialize shared components
 policy_engine = PolicyEngine()
 telemetry = TelemetrySystem()
 billing = BillingService(telemetry.Session)
 notifier = NotificationService()
-# graph = build_graph() # Note: Requires active GROQ_API_KEY
-graph = None # Initialized on demand or in startup
+graph = None
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    import logging
+
+    log = logging.getLogger("parksight-api")
+    try:
+        bootstrap_users(telemetry.engine)
+    except Exception as e:
+        log.exception("API user bootstrap failed: %s", e)
+        raise
+    init_sentry()
+    yield
+
+
+class ParkSightAuthMiddleware(BaseHTTPMiddleware):
+    """When PARKSIGHT_REQUIRE_AUTH=1, require Bearer JWT (or PARKSIGHT_SERVICE_BEARER) except public paths."""
+
+    EXEMPT_PATHS = frozenset({"/health", "/metrics", "/auth/token", "/auth/login"})
+    EXEMPT_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+
+    async def dispatch(self, request: Request, call_next):
+        from .security import AuthError, _require_auth_enabled, parse_authorization_header
+
+        if not _require_auth_enabled():
+            return await call_next(request)
+        path = request.url.path
+        if path in self.EXEMPT_PATHS or any(path.startswith(p) for p in self.EXEMPT_PREFIXES):
+            return await call_next(request)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        auth = request.headers.get("Authorization")
+        try:
+            parse_authorization_header(auth)
+        except AuthError as e:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": str(e)},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return await call_next(request)
+
+
+app = FastAPI(title="ParkSight API - Production", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.getenv("PARKSIGHT_CORS_ORIGINS", "*").split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(ParkSightAuthMiddleware)
+
+app.include_router(auth_router)
+app.include_router(calibration_router)
+app.include_router(monitoring_router)
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+except ImportError:
+    pass
 
 class Slot(BaseModel):
     id: int
@@ -93,7 +154,11 @@ class CloseParkingSessionRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "components": ["policy", "telemetry", "langgraph", "billing"]}
+    return {
+        "status": "ok",
+        "components": ["policy", "telemetry", "langgraph", "billing", "auth"],
+        "auth_required": os.getenv("PARKSIGHT_REQUIRE_AUTH", "").lower() in ("1", "true", "yes"),
+    }
 
 @app.post("/system/process")
 async def process_scene(scene: Scene):
@@ -359,7 +424,7 @@ def record_invoice_payment(invoice_id: int, body: BillingPaymentRequest):
 
 
 @app.post("/billing/invoices/{invoice_id}/void")
-def void_invoice(invoice_id: int):
+def void_invoice(invoice_id: int, _admin=Depends(require_admin)):
     try:
         return billing.void_invoice(invoice_id)
     except ValueError as e:

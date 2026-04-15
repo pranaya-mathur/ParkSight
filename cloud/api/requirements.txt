@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+python-multipart
 pydantic
 langchain
 langgraph
@@ -9,3 +10,9 @@ requests
 shapely
 sqlalchemy
 psycopg2-binary
+numpy
+passlib
+python-jose[cryptography]
+prometheus-fastapi-instrumentator
+prometheus-client
+sentry-sdk

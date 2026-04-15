@@ -23,8 +23,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://parksight:parksight@db:5432/parksight_db
       - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - PARKSIGHT_REQUIRE_AUTH=${PARKSIGHT_REQUIRE_AUTH:-0}
+      - PARKSIGHT_JWT_SECRET=${PARKSIGHT_JWT_SECRET:-change-me-in-production}
+      - PARKSIGHT_SERVICE_BEARER=${PARKSIGHT_SERVICE_BEARER:-}
+      - SENTRY_DSN=${SENTRY_DSN:-}
     volumes:
       - parksight-telemetry:/app/telemetry
+      - ./edge/configs:/app/edge/configs
     networks:
       - parksight-net
 
@@ -36,7 +41,9 @@ services:
       - api
     environment:
       - API_URL=http://api:8000/system/process
+      - RESERVE_URL=http://api:8000/reservations/active
       - CAMERA_SOURCE=${CAMERA_SOURCE:-MOCK}
+      - PARKSIGHT_SERVICE_BEARER=${PARKSIGHT_SERVICE_BEARER:-}
     volumes:
        - parksight-models:/app/edge/models
     networks:
