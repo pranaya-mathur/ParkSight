@@ -32,7 +32,8 @@ edge/models/*.onnx
 .vscode/
 .idea/
 *.swp
-# Databases & Local History
+# Databases & Local History (never commit — GitHub rejects files > 100 MB)
+parksight.db
 *.db
 *.sqlite3
 *.log
