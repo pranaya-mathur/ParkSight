@@ -30,8 +30,17 @@ dependencies = [
     "prometheus-fastapi-instrumentator",
     "prometheus-client",
     "sentry-sdk",
+    "tqdm",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cloud*", "edge*", "brain*"]
+include = ["cloud*", "edge*", "brain*", "evaluation*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "evaluation: slow model / video evaluation tests (run with pytest -m evaluation)",
+]
+filterwarnings = [
+    "ignore::urllib3.exceptions.NotOpenSSLWarning",
+]

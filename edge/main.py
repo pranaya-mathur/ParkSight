@@ -22,6 +22,12 @@ def _cloud_headers():
     if t:
         return {"Authorization": f"Bearer {t}"}
     return {}
+
+
+HEARTBEAT_URL = os.getenv("PARKSIGHT_HEARTBEAT_URL", "").strip()
+_EWMA_ALPHA = float(os.getenv("PARKSIGHT_EWMA_ALPHA", "0.15"))
+_ewma_fps = None
+
 CAMERA_CONFIGS = [
     {"id": "CAM-01", "source": os.getenv("CAMERA_SOURCE", "MOCK")}
 ]
@@ -54,7 +60,10 @@ def run_edge_node():
     # Initialize multi-camera orchestrator
     sb = SceneBuilder(camera_configs=camera_configs, engine=slot_engine)
     
+    global _ewma_fps
+
     while True:
+        loop_t0 = time.time()
         try:
             # 2. Fetch active reservations from Cloud
             reserved_slots = set()
@@ -81,7 +90,25 @@ def run_edge_node():
                     
         except Exception as e:
             logger.error(f"❌ Edge Loop Error: {e}")
-            
+
+        # EWMA FPS (loop body + network); optional push to API Prometheus path via heartbeat
+        dt = max(time.time() - loop_t0, 1e-3)
+        inst_fps = 1.0 / dt
+        if _ewma_fps is None:
+            _ewma_fps = inst_fps
+        else:
+            _ewma_fps = _EWMA_ALPHA * inst_fps + (1.0 - _EWMA_ALPHA) * _ewma_fps
+        if HEARTBEAT_URL:
+            try:
+                requests.post(
+                    HEARTBEAT_URL,
+                    json={"camera_id": c_id, "fps": float(_ewma_fps)},
+                    timeout=2,
+                    headers={**_cloud_headers(), "Content-Type": "application/json"},
+                )
+            except Exception:
+                pass
+
         # 5. Dynamic Interval: 1s for local files, 15s for live streams (to save Groq tokens)
         interval = 1 if is_test_mode else 15
         time.sleep(interval)

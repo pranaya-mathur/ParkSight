@@ -90,7 +90,8 @@ sequenceDiagram
 | `docker/` | `Dockerfile.api`, `Dockerfile.edge`, `Dockerfile.ui`, `nginx-ui.conf` (proxies `/api` to the API) |
 | `download_models.py` | YOLO weights + ONNX bundles (Re-ID, LPRNet, MNet) into `edge/` and `edge/models/` |
 | `infra/helm/` | Kubernetes Helm chart |
-| `tests/` | Pytest: API, billing, brain, edge slot/scene, stack contract, optional live Groq smoke |
+| `tests/` | Pytest: API, billing, brain, edge slot/scene, stack contract, pilot simulation, metrics, optional Groq smoke |
+| `evaluation/` | Offline `evaluate_models.py`, GT template generator, shared `metrics.py` |
 
 **Dependency entry points:** root **`requirements.txt`** (full stack including edge CV). **`cloud/api/requirements.txt`** targets the API Docker image. **`pyproject.toml`** names the `parksight-ai` package (`cloud*`, `edge*`, `brain*`) for editable installs.
 
@@ -241,16 +242,69 @@ Kubernetes assets: **`infra/helm/`**.
 # Python (from repo root, venv active)
 pytest tests/ -q
 
+# Slow / model-heavy subset (YOLO weights, larger loops)
+pytest tests/ -m evaluation -q
+
 # UI production bundle
 cd ui && npm ci && npm run build
 ```
 
 **Compose file validation:** `docker compose config -q`
 
+**Optional eval container (same image as edge, runs `-m evaluation`):**
+
+```bash
+docker compose --profile eval run --rm eval
+```
+
 **Notes:**
 
 - Prefer running tests with **network enabled** if `GROQ_API_KEY` is set, so the optional live Groq smoke test can reach the API.
 - Some tests are **skipped** when optional ONNX files are absent; CI or local runs with `edge/models/` populated exercise the full identity path.
+- **`@pytest.mark.evaluation`** marks slower checks (FPS/IOA/gallery). Default `pytest tests/` stays fast for CI.
+
+---
+
+## Testing & evaluation (pilot prep)
+
+### Unit & integration tests
+
+| Command | Purpose |
+|---------|---------|
+| `pytest tests/ -q` | Full suite (API, brain mocks, edge slot/scene, billing, auth, calibration, pilot chain). |
+| `pytest tests/ -m evaluation -q` | Model-weighted checks (YOLO present, IOA sweeps, embedding gallery). |
+| `pytest tests/test_evaluation_metrics_unit.py -q` | Pure metrics (Levenshtein, homography repro, slot accuracy helpers). |
+
+### Offline model / video evaluation
+
+See **`evaluation/README.md`**. Quick dry-run (FPS + detection histogram, no labels):
+
+```bash
+python -m evaluation.evaluate_models --video path/to/clip.mp4 --dry-run --max-frames 200 --output eval_results.json
+```
+
+Ground-truth template:
+
+```bash
+python -m evaluation.generate_ground_truth --output my_gt.json --num-frames 500
+# Then label frames under "frames" and run with --gt my_gt.json
+```
+
+### Suggested pilot thresholds (tune after calibration)
+
+After you annotate an internal set (e.g. 200–500 frames), record means in `eval_results.json` and compare:
+
+| Metric | Example target |
+|--------|----------------|
+| Mean slot status accuracy | ≥ 0.90 |
+| Mean ALPR char accuracy (edit-distance based) | ≥ 0.85 |
+| Mean FPS (CPU edge class) | ≥ 8 (small YOLO) |
+| Borderline IOA count per frame | Down after good homography |
+
+### Edge observability in tests
+
+- **`GET /metrics`** is smoke-tested in `tests/test_metrics_scrape.py`.
+- Edge loop can POST **`PARKSIGHT_HEARTBEAT_URL`** (e.g. `http://api:8000/monitoring/heartbeat`) with EWMA-smoothed FPS (`PARKSIGHT_EWMA_ALPHA`, default `0.15`).
 
 ---
 

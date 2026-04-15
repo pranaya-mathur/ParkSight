@@ -34,3 +34,4 @@ python-jose[cryptography]
 prometheus-fastapi-instrumentator
 prometheus-client
 sentry-sdk
+tqdm

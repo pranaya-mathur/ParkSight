@@ -38,3 +38,4 @@ parksight.db
 *.sqlite3
 *.log
 telemetry/
+eval_results.json

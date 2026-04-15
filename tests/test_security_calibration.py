@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from cloud.api.calibration_routes import _homography_from_four_pairs
 from cloud.api.main import app
 from cloud.api.security import AuthError, create_access_token, parse_authorization_header
+from evaluation.metrics import homography_reprojection_max_error
 
 
 def test_homography_numpy_four_points():
@@ -64,6 +65,29 @@ def test_calibration_save_and_roundtrip(tmp_path, monkeypatch):
     r2 = client.get("/calibration/slot-config")
     assert r2.status_code == 200
     assert r2.json()["camera_id"] == "CAM-TEST"
+
+
+def test_homography_reprojection_error_under_five_pixels():
+    src = [[10, 20], [110, 20], [110, 120], [10, 120]]
+    dst = [[12, 18], [108, 22], [112, 118], [8, 122]]
+    h = _homography_from_four_pairs(
+        np.array(src, dtype=float),
+        np.array(dst, dtype=float),
+    )
+    err = homography_reprojection_max_error(h, src, dst)
+    assert err < 5.0
+
+
+def test_calibration_rejects_short_polygon(tmp_path, monkeypatch):
+    monkeypatch.setenv("PARKSIGHT_CALIBRATION_PATH", str(tmp_path / "kaggle_config.json"))
+    client = TestClient(app)
+    payload = {
+        "camera_id": "CAM-BAD",
+        "homography": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        "slots": [{"id": 0, "polygon": [[0, 0], [1, 0]], "distance": 1.0}],
+    }
+    r = client.post("/calibration/slot-config", json=payload)
+    assert r.status_code == 400
 
 
 def test_auth_login_json():

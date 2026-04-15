@@ -90,3 +90,39 @@ def test_graph_invoke_live_groq_smoke():
     )
     assert result.get("explanation")
     assert result.get("revenue_data") is not None
+
+
+def test_graph_surge_pricing_data_present_when_high_occupancy_mocked(monkeypatch):
+    """High occupancy scene should still yield structured revenue_data from graph."""
+    mock_llm = MagicMock()
+
+    def fake_invoke(_messages):
+        r = MagicMock()
+        r.content = "Occupancy elevated; surge pricing may apply."
+        return r
+
+    mock_llm.invoke.side_effect = fake_invoke
+    monkeypatch.setattr("brain.graph.ChatGroq", lambda **kwargs: mock_llm)
+
+    graph = build_graph()
+    slots = [{"id": i, "status": "occupied" if i < 18 else "free", "distance": float(i)} for i in range(20)]
+    result = graph.invoke(
+        {
+            "scene": {"slots": slots, "hazards": []},
+            "violations": [],
+            "explanation": "",
+            "best_slot": 19,
+            "classification": "STANDARD",
+        }
+    )
+    assert result.get("revenue_data") is not None
+
+
+def test_graph_offline_when_groq_construct_fails(monkeypatch):
+    """If ChatGroq cannot be constructed, document graceful failure (skip if graph still builds)."""
+    def boom(**kwargs):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr("brain.graph.ChatGroq", boom)
+    with pytest.raises(RuntimeError):
+        build_graph()

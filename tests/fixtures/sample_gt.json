@@ -1,0 +1,13 @@
+{
+  "_comment": "Example for evaluation/evaluate_models.py — adjust slot ids to match your slot_config.",
+  "frames": {
+    "0": {
+      "slots": [{"id": 0, "status": "free"}, {"id": 1, "status": "free"}],
+      "plate": ""
+    },
+    "1": {
+      "slots": [{"id": 0, "status": "occupied"}, {"id": 1, "status": "free"}],
+      "plate": "TESTPLATE"
+    }
+  }
+}

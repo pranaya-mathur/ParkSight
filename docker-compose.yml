@@ -60,6 +60,24 @@ services:
     networks:
       - parksight-net
 
+  # Optional: docker compose --profile eval run --rm eval
+  eval:
+    profiles: ["eval"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.edge
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=sqlite:///:memory:
+      - PARKSIGHT_REQUIRE_AUTH=0
+      - PARKSIGHT_JWT_SECRET=eval-docker-secret-min-32-chars!!!!!!
+    command: ["python", "-m", "pytest", "tests/", "-q", "-m", "evaluation", "--tb=line"]
+    volumes:
+      - .:/app
+    networks:
+      - parksight-net
+
 volumes:
   postgres_data:
   parksight-telemetry:
