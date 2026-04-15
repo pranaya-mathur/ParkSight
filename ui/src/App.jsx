@@ -16,6 +16,8 @@ import {
   Banknote,
   Receipt,
   Wallet,
+  FileText,
+  CreditCard,
   Cpu,
   Zap,
   Globe
@@ -31,6 +33,17 @@ const App = () => {
   const [violations, setViolations] = useState([]);
   const [revenueSummary, setRevenueSummary] = useState({ total_revenue: 0, pending_revenue: 0, active_tickets: 0 });
   const [tickets, setTickets] = useState([]);
+  const [billingSummary, setBillingSummary] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [invoiceDetail, setInvoiceDetail] = useState(null);
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [ticketIdsInput, setTicketIdsInput] = useState('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('UPI');
+  const [payRef, setPayRef] = useState('');
+  const [sessionVehicle, setSessionVehicle] = useState('VEH-DEMO');
+  const [sessionSlot, setSessionSlot] = useState('1');
+  const [billingMsg, setBillingMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Signage Ticker Component
@@ -162,6 +175,14 @@ const App = () => {
         setViolations(violRes);
         setRevenueSummary(revRes);
         setTickets(tickRes);
+        if (revRes.billing_payments_total !== undefined) {
+          setBillingSummary({
+            payments_completed_total: revRes.billing_payments_total,
+            accounts_receivable_open: revRes.billing_ar_open,
+            invoice_paid_total: revRes.billing_invoice_paid_total,
+            invoice_counts: revRes.billing_invoice_counts,
+          });
+        }
       } catch (err) {
         console.error("Fetch error:", err);
       } finally {
@@ -173,6 +194,113 @@ const App = () => {
     const interval = setInterval(fetchAll, 3000);
     return () => clearInterval(interval);
   }, [selectedCamera]);
+
+  const refreshBilling = async () => {
+    try {
+      const [sum, inv, sess] = await Promise.all([
+        fetch('/api/billing/summary').then(r => r.json()),
+        fetch('/api/billing/invoices').then(r => r.json()),
+        fetch('/api/billing/sessions').then(r => r.json()),
+      ]);
+      setBillingSummary(sum);
+      setInvoices(inv);
+      setActiveSessions(sess);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (view !== 'billing') return;
+    refreshBilling();
+    const t = setInterval(refreshBilling, 4000);
+    return () => clearInterval(t);
+  }, [view]);
+
+  const loadInvoiceDetail = async (id) => {
+    const r = await fetch(`/api/billing/invoices/${id}`);
+    if (r.ok) setInvoiceDetail(await r.json());
+  };
+
+  const submitPayment = async () => {
+    if (!invoiceDetail || !payAmount) return;
+    setBillingMsg('');
+    const r = await fetch(`/api/billing/invoices/${invoiceDetail.id}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: parseFloat(payAmount),
+        method: payMethod,
+        reference: payRef || null,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setBillingMsg(j.detail || 'Payment failed');
+      return;
+    }
+    setInvoiceDetail(j.invoice);
+    setPayAmount('');
+    setPayRef('');
+    refreshBilling();
+  };
+
+  const createInvoiceFromTickets = async () => {
+    setBillingMsg('');
+    const ids = ticketIdsInput.split(/[\s,]+/).map((x) => parseInt(x, 10)).filter((n) => !Number.isNaN(n));
+    if (!ids.length) {
+      setBillingMsg('Enter ticket IDs (comma-separated)');
+      return;
+    }
+    const r = await fetch('/api/billing/invoices/from-tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket_ids: ids }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setBillingMsg(typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail || j));
+      return;
+    }
+    setTicketIdsInput('');
+    setInvoiceDetail(j);
+    refreshBilling();
+  };
+
+  const startParkingSession = async () => {
+    setBillingMsg('');
+    const r = await fetch('/api/billing/sessions/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vehicle_id: sessionVehicle,
+        slot_id: parseInt(sessionSlot, 10) || 0,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setBillingMsg(j.detail || 'Failed');
+      return;
+    }
+    setBillingMsg(`Session #${j.id} started`);
+    refreshBilling();
+  };
+
+  const closeParkingSession = async (sessionId) => {
+    setBillingMsg('');
+    const r = await fetch(`/api/billing/sessions/${sessionId}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setBillingMsg(typeof j.detail === 'string' ? j.detail : 'Close failed');
+      return;
+    }
+    setInvoiceDetail(j);
+    refreshBilling();
+  };
 
   const NavItem = ({ id, icon: Icon, label }) => (
     <div 
@@ -202,6 +330,7 @@ const App = () => {
           <NavItem id="live" icon={LayoutDashboard} label="Neural Live Map" />
           <NavItem id="analytics" icon={BarChart3} label="Space Analytics" />
           <NavItem id="revenue" icon={Banknote} label="Revenue Hub" />
+          <NavItem id="billing" icon={FileText} label="Billing & AR" />
           <NavItem id="violations" icon={History} label="Enforcement Log" />
         </nav>
 
@@ -485,6 +614,23 @@ const App = () => {
                 ))}
               </div>
 
+              {billingSummary && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  <div className="glass p-4 border border-white/5">
+                    Collected (payments ledger):{' '}
+                    <span className="text-success">₹{Number(billingSummary.payments_completed_total || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="glass p-4 border border-white/5">
+                    Open AR (invoices):{' '}
+                    <span className="text-primary">₹{Number(billingSummary.accounts_receivable_open || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="glass p-4 border border-white/5">
+                    Invoices paid (face):{' '}
+                    <span className="text-slate-200">₹{Number(billingSummary.invoice_paid_total || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="glass p-10">
                 <div className="flex items-center justify-between mb-10">
                   <h3 className="text-sm font-black tracking-[0.25em] uppercase flex items-center gap-3">
@@ -534,6 +680,208 @@ const App = () => {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'billing' && (
+            <motion.div
+              key="billing"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8 max-w-6xl mx-auto"
+            >
+              <div className="flex flex-wrap gap-4 justify-between items-end">
+                <div>
+                  <h3 className="text-sm font-black tracking-[0.25em] uppercase flex items-center gap-3 text-primary">
+                    <FileText size={20} /> Billing & accounts receivable
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-2 font-bold uppercase tracking-widest">
+                    GST invoices (9% CGST + 9% SGST), payments, metered parking
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshBilling}
+                  className="px-5 py-2 rounded-full glass border-primary/30 text-[10px] font-black text-primary uppercase"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {billingMsg && (
+                <div className="text-xs text-danger font-bold bg-danger/10 border border-danger/30 rounded-xl px-4 py-3">
+                  {billingMsg}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="glass p-8 space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Parking session</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <input
+                      className="flex-1 min-w-[140px] bg-slate-950/80 border border-white/10 rounded-lg px-3 py-2 text-sm"
+                      value={sessionVehicle}
+                      onChange={(e) => setSessionVehicle(e.target.value)}
+                      placeholder="vehicle_id"
+                    />
+                    <input
+                      className="w-24 bg-slate-950/80 border border-white/10 rounded-lg px-3 py-2 text-sm"
+                      value={sessionSlot}
+                      onChange={(e) => setSessionSlot(e.target.value)}
+                      placeholder="slot"
+                    />
+                    <button
+                      type="button"
+                      onClick={startParkingSession}
+                      className="px-4 py-2 rounded-lg bg-primary text-white text-[10px] font-black uppercase"
+                    >
+                      Start
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeSessions.length === 0 ? (
+                      <p className="text-xs text-slate-600 italic">No active sessions</p>
+                    ) : (
+                      activeSessions.map((s) => (
+                        <div key={s.id} className="flex justify-between items-center text-xs border border-white/5 rounded-lg px-3 py-2">
+                          <span className="font-mono text-slate-400">#{s.id}</span>
+                          <span className="text-slate-200">{s.vehicle_id}</span>
+                          <span className="text-slate-500">slot {s.slot_id}</span>
+                          <button
+                            type="button"
+                            onClick={() => closeParkingSession(s.id)}
+                            className="text-[10px] font-black uppercase text-accent"
+                          >
+                            Close & bill
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="glass p-8 space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Invoice from tickets</h4>
+                  <p className="text-[10px] text-slate-600">Same vehicle only. Unpaid tickets only.</p>
+                  <input
+                    className="w-full bg-slate-950/80 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono"
+                    value={ticketIdsInput}
+                    onChange={(e) => setTicketIdsInput(e.target.value)}
+                    placeholder="e.g. 1, 2, 3"
+                  />
+                  <button
+                    type="button"
+                    onClick={createInvoiceFromTickets}
+                    className="px-4 py-2 rounded-lg border border-primary/40 text-primary text-[10px] font-black uppercase"
+                  >
+                    Create invoice
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="glass p-8 overflow-x-auto">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Invoices</h4>
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="text-[10px] text-slate-600 uppercase border-b border-white/5">
+                        <th className="pb-3">#</th>
+                        <th className="pb-3">Vehicle</th>
+                        <th className="pb-3">Status</th>
+                        <th className="pb-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {invoices.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-slate-600 italic">
+                            No invoices yet
+                          </td>
+                        </tr>
+                      ) : (
+                        invoices.map((inv) => (
+                          <tr
+                            key={inv.id}
+                            className={`cursor-pointer hover:bg-white/5 ${invoiceDetail?.id === inv.id ? 'bg-primary/10' : ''}`}
+                            onClick={() => loadInvoiceDetail(inv.id)}
+                          >
+                            <td className="py-3 font-mono text-slate-500">{inv.number}</td>
+                            <td className="py-3 font-bold text-slate-200">{inv.vehicle_id}</td>
+                            <td className="py-3">
+                              <span className="px-2 py-0.5 rounded bg-white/5 text-[9px] font-black">{inv.status}</span>
+                            </td>
+                            <td className="py-3 text-right font-mono">₹{inv.total?.toFixed(2)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="glass p-8 space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    <CreditCard size={14} /> Invoice detail & payment
+                  </h4>
+                  {!invoiceDetail ? (
+                    <p className="text-xs text-slate-600 italic">Select an invoice</p>
+                  ) : (
+                    <>
+                      <div className="text-sm font-black text-white">{invoiceDetail.number}</div>
+                      <div className="text-[10px] text-slate-500 space-y-1">
+                        <div>
+                          Subtotal ₹{invoiceDetail.subtotal?.toFixed(2)} + CGST ₹{invoiceDetail.cgst_amount?.toFixed(2)} + SGST ₹
+                          {invoiceDetail.sgst_amount?.toFixed(2)}
+                        </div>
+                        <div className="text-slate-300">
+                          Total ₹{invoiceDetail.total?.toFixed(2)} · Paid ₹{invoiceDetail.amount_paid?.toFixed(2)} · Balance ₹
+                          {invoiceDetail.balance?.toFixed(2)}
+                        </div>
+                      </div>
+                      <ul className="text-[10px] text-slate-400 space-y-1 max-h-28 overflow-y-auto border border-white/5 rounded-lg p-3">
+                        {invoiceDetail.lines?.map((ln) => (
+                          <li key={ln.id}>
+                            {ln.description} — ₹{ln.amount?.toFixed(2)}
+                          </li>
+                        ))}
+                      </ul>
+                      {invoiceDetail.status !== 'PAID' && invoiceDetail.status !== 'VOID' && (
+                        <div className="flex flex-wrap gap-2 items-end pt-2">
+                          <input
+                            type="number"
+                            className="w-28 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-2 text-sm"
+                            placeholder="Amount"
+                            value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                          />
+                          <select
+                            className="bg-slate-950/80 border border-white/10 rounded-lg px-2 py-2 text-xs"
+                            value={payMethod}
+                            onChange={(e) => setPayMethod(e.target.value)}
+                          >
+                            <option value="UPI">UPI</option>
+                            <option value="CARD">Card</option>
+                            <option value="CASH">Cash</option>
+                            <option value="BANK_TRANSFER">Bank</option>
+                          </select>
+                          <input
+                            className="flex-1 min-w-[120px] bg-slate-950/80 border border-white/10 rounded-lg px-2 py-2 text-xs"
+                            placeholder="Reference / UTR"
+                            value={payRef}
+                            onChange={(e) => setPayRef(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={submitPayment}
+                            className="px-4 py-2 rounded-lg bg-success text-slate-950 text-[10px] font-black uppercase"
+                          >
+                            Record payment
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>

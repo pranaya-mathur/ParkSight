@@ -26,6 +26,7 @@ Thumbs.db
 edge/*.pt
 edge/*.tflite
 edge/*.onnx
+edge/models/*.onnx
 
 # IDEs
 .vscode/

@@ -17,6 +17,7 @@ dependencies = [
     "shapely",
     "ultralytics",
     "opencv-python-headless",
+    "onnxruntime",
     "numpy",
     "langgraph",
     "langchain-groq",

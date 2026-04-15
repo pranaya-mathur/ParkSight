@@ -2,9 +2,8 @@ import logging
 import json
 import datetime
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 import numpy as np
 
@@ -42,6 +41,62 @@ class Ticket(Base):
     amount = Column(Float)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     status = Column(String(20), default="UNPAID") # UNPAID, PAID, VOIDED
+
+
+class Invoice(Base):
+    __tablename__ = "billing_invoices"
+    id = Column(Integer, primary_key=True)
+    number = Column(String(40), unique=True, nullable=False)
+    vehicle_id = Column(String(50), nullable=False)
+    status = Column(String(24), default="DRAFT")  # DRAFT, OPEN, PARTIALLY_PAID, PAID, VOID
+    currency = Column(String(8), default="INR")
+    subtotal = Column(Float, default=0.0)
+    cgst_amount = Column(Float, default=0.0)
+    sgst_amount = Column(Float, default=0.0)
+    total = Column(Float, default=0.0)
+    amount_paid = Column(Float, default=0.0)
+    issue_date = Column(DateTime, default=datetime.datetime.utcnow)
+    due_date = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+
+
+class ParkingSession(Base):
+    """Metered parking session (billable)."""
+    __tablename__ = "parking_sessions"
+    id = Column(Integer, primary_key=True)
+    vehicle_id = Column(String(50), nullable=False)
+    slot_id = Column(Integer, nullable=False)
+    started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    ended_at = Column(DateTime, nullable=True)
+    hourly_rate = Column(Float, default=100.0)
+    vehicle_type = Column(String(20), default="STANDARD")
+    status = Column(String(20), default="ACTIVE")  # ACTIVE, CLOSED, BILLED
+    invoice_id = Column(Integer, ForeignKey("billing_invoices.id"), nullable=True)
+
+
+class InvoiceLine(Base):
+    __tablename__ = "billing_invoice_lines"
+    id = Column(Integer, primary_key=True)
+    invoice_id = Column(Integer, ForeignKey("billing_invoices.id"), nullable=False)
+    description = Column(String(255), nullable=False)
+    line_type = Column(String(32), default="OTHER")  # VIOLATION, PARKING, DISCOUNT, OTHER
+    quantity = Column(Float, default=1.0)
+    unit_price = Column(Float, default=0.0)
+    amount = Column(Float, default=0.0)
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=True)
+    parking_session_id = Column(Integer, ForeignKey("parking_sessions.id"), nullable=True)
+
+
+class Payment(Base):
+    __tablename__ = "billing_payments"
+    id = Column(Integer, primary_key=True)
+    invoice_id = Column(Integer, ForeignKey("billing_invoices.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    method = Column(String(24), default="UPI")  # UPI, CARD, CASH, WALLET, BANK_TRANSFER
+    reference = Column(String(120), nullable=True)
+    status = Column(String(20), default="COMPLETED")  # PENDING, COMPLETED, FAILED
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 
 class TelemetrySystem:
     """Enterprise-grade telemetry system with Vehicle Re-ID matching."""

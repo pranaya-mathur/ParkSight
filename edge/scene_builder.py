@@ -1,7 +1,10 @@
-import time
-import random
 import logging
+import time
 from typing import List, Optional
+
+import numpy as np
+from shapely.geometry import Point, Polygon
+
 from .camera_service import CameraService
 from .cv_inference import CVInference
 from .slot_engine import SlotEngine
@@ -45,6 +48,47 @@ class SceneBuilder:
         # If a plate is missing or "blocked", we could flag it
         return list(set(hazards))
 
+    def _vehicle_crop_for_slot(
+        self, frame_data: dict, detections: list, slot: dict
+    ) -> Optional[np.ndarray]:
+        """Crop vehicle from frame using detection bbox whose center lies in the slot polygon."""
+        img = frame_data.get("data")
+        if img is None or not isinstance(img, np.ndarray) or img.ndim < 2:
+            return None
+        pts = slot.get("polygon_points")
+        if not pts or len(pts) < 3:
+            return None
+        try:
+            poly = Polygon(pts)
+        except Exception:
+            return None
+        best_bbox = None
+        best_conf = -1.0
+        for det in detections:
+            if det.get("label") not in ("car", "truck", "bus", "motorcycle"):
+                continue
+            bbox = det.get("bbox")
+            if not bbox or len(bbox) < 4:
+                continue
+            x1, y1, x2, y2 = (float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
+            cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+            if not poly.contains(Point(cx, cy)):
+                continue
+            conf = float(det.get("confidence", 0))
+            if conf > best_conf:
+                best_conf = conf
+                best_bbox = (x1, y1, x2, y2)
+        if best_bbox is None:
+            return None
+        x1, y1, x2, y2 = best_bbox
+        h, w = img.shape[:2]
+        xi1, yi1 = max(0, int(x1)), max(0, int(y1))
+        xi2, yi2 = min(w, int(x2)), min(h, int(y2))
+        if xi2 <= xi1 or yi2 <= yi1:
+            return None
+        crop = img[yi1:yi2, xi1:xi2]
+        return crop if crop.size else None
+
     def build_scenes(self, reserved_slots: set = None):
         """Builds snapshots for ALL connected cameras with ALPR, Re-ID, and Reservations."""
         scenes = []
@@ -60,8 +104,10 @@ class SceneBuilder:
                 # Enrich occupancy with Identity (ALPR + Re-ID)
                 for slot in occupancy:
                     if slot["status"] == "occupied":
-                        # Simulate crop and extraction
-                        identity = self.identity_engine.extract_identity(None, vehicle_id_seed=slot["id"])
+                        crop = self._vehicle_crop_for_slot(frame, detections, slot)
+                        identity = self.identity_engine.extract_identity(
+                            crop, vehicle_id_seed=slot["id"]
+                        )
                         slot["license_plate"] = identity["license_plate"]
                         slot["embedding"] = identity["embedding"]
                 

@@ -17,8 +17,8 @@ class HomographyTransformer:
         """Applies homography to a single (x, y) point."""
         point = np.array([x, y, 1.0]).reshape(3, 1)
         new_point = self.H @ point
-        new_point /= new_point[2] # Normalize (z-axis)
-        return float(new_point[0]), float(new_point[1])
+        new_point /= new_point[2, 0]  # normalize homogeneous coordinate
+        return float(new_point[0, 0]), float(new_point[1, 0])
 
     def transform_bbox(self, bbox):
         """Transforms a bounding box [x1, y1, x2, y2]."""

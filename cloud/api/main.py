@@ -1,7 +1,9 @@
+import datetime
+import os
+from typing import List, Optional
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
-import os
 from sqlalchemy import func
 from dotenv import load_dotenv
 from .policy_engine import PolicyEngine
@@ -10,6 +12,7 @@ from .reports import ReportGenerator
 from .notifications import NotificationService
 from .analytics_service import AnalyticsService
 from .predictor_service import PredictorService
+from .billing_service import BillingService
 from brain.graph import build_graph
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,6 +33,7 @@ app.add_middleware(
 # Initialize shared components
 policy_engine = PolicyEngine()
 telemetry = TelemetrySystem()
+billing = BillingService(telemetry.Session)
 notifier = NotificationService()
 # graph = build_graph() # Note: Requires active GROQ_API_KEY
 graph = None # Initialized on demand or in startup
@@ -50,9 +54,46 @@ class ReservationRequest(BaseModel):
     slot_id: int
     vehicle_id: str
 
+
+class InvoiceFromTicketsRequest(BaseModel):
+    ticket_ids: List[int]
+    notes: Optional[str] = None
+
+
+class ManualInvoiceLine(BaseModel):
+    description: str
+    quantity: float = 1.0
+    unit_price: float
+    line_type: str = "OTHER"
+
+
+class ManualInvoiceRequest(BaseModel):
+    vehicle_id: str
+    lines: List[ManualInvoiceLine]
+    notes: Optional[str] = None
+
+
+class BillingPaymentRequest(BaseModel):
+    amount: float
+    method: str = "UPI"
+    reference: Optional[str] = None
+
+
+class StartParkingSessionRequest(BaseModel):
+    vehicle_id: str
+    slot_id: int
+    hourly_rate: Optional[float] = None
+    vehicle_type: str = "STANDARD"
+    occupancy_percent: float = 0.0
+
+
+class CloseParkingSessionRequest(BaseModel):
+    ended_at: Optional[str] = None
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok", "components": ["policy", "telemetry", "langgraph"]}
+    return {"status": "ok", "components": ["policy", "telemetry", "langgraph", "billing"]}
 
 @app.post("/system/process")
 async def process_scene(scene: Scene):
@@ -128,10 +169,12 @@ async def process_scene(scene: Scene):
                 telemetry.create_ticket(v_id, v["type"], amount=500.0)
 
     # 5. Build Final Response
+    guidance_best = result.get("best_slot", best_slot) if isinstance(result, dict) else best_slot
     guidance_data = {
         "message": explanation,
         "broadcast": result.get("broadcast", "PROCEED WITH CAUTION"),
-        "revenue": result.get("revenue_data", {})
+        "revenue": result.get("revenue_data", {}),
+        "best_slot": guidance_best,
     }
     
     # 6. Comprehensive Telemetry Log (Captures full processed state)
@@ -234,18 +277,23 @@ def get_active_reservations():
 
 @app.get("/revenue/summary")
 def get_revenue_summary():
-    """Summarizes facility-wide earnings and tickets."""
+    """Summarizes facility-wide earnings, tickets, and billing ledger (GST invoices + payments)."""
     session = telemetry.Session()
     from .telemetry import Ticket
     total_revenue = session.query(func.sum(Ticket.amount)).filter(Ticket.status == 'PAID').scalar() or 0
     pending_revenue = session.query(func.sum(Ticket.amount)).filter(Ticket.status == 'UNPAID').scalar() or 0
     active_tickets = session.query(Ticket).filter(Ticket.status == 'UNPAID').count()
     session.close()
+    bs = billing.billing_summary()
     return {
         "total_revenue": total_revenue,
         "pending_revenue": pending_revenue,
         "active_tickets": active_tickets,
-        "currency": "INR"
+        "currency": "INR",
+        "billing_payments_total": bs["payments_completed_total"],
+        "billing_ar_open": bs["accounts_receivable_open"],
+        "billing_invoice_paid_total": bs["invoice_paid_total"],
+        "billing_invoice_counts": bs["invoice_counts"],
     }
 
 @app.get("/revenue/tickets")
@@ -264,6 +312,87 @@ def get_all_tickets():
     } for t in tickets]
     session.close()
     return out
+
+
+@app.get("/billing/summary")
+def billing_summary():
+    """Accounts receivable: paid invoices, cash/collected payments, open AR."""
+    return billing.billing_summary()
+
+
+@app.get("/billing/invoices")
+def list_invoices(status: Optional[str] = None, vehicle_id: Optional[str] = None, limit: int = 100):
+    return billing.list_invoices(status=status, vehicle_id=vehicle_id, limit=limit)
+
+
+@app.get("/billing/invoices/{invoice_id}")
+def get_invoice_detail(invoice_id: int):
+    try:
+        return billing.get_invoice_by_id(invoice_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/billing/invoices/from-tickets")
+def create_invoice_from_tickets(body: InvoiceFromTicketsRequest):
+    try:
+        return billing.create_invoice_from_tickets(body.ticket_ids, notes=body.notes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/billing/invoices")
+def create_manual_invoice(body: ManualInvoiceRequest):
+    try:
+        lines = [line.model_dump() for line in body.lines]
+        return billing.create_manual_invoice(body.vehicle_id, lines, notes=body.notes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/billing/invoices/{invoice_id}/payments")
+def record_invoice_payment(invoice_id: int, body: BillingPaymentRequest):
+    try:
+        return billing.record_payment(invoice_id, body.amount, method=body.method, reference=body.reference)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/billing/invoices/{invoice_id}/void")
+def void_invoice(invoice_id: int):
+    try:
+        return billing.void_invoice(invoice_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/billing/sessions/start")
+def start_parking_session(body: StartParkingSessionRequest):
+    return billing.start_parking_session(
+        body.vehicle_id,
+        body.slot_id,
+        hourly_rate=body.hourly_rate,
+        vehicle_type=body.vehicle_type,
+        occupancy_percent=body.occupancy_percent,
+    )
+
+
+@app.get("/billing/sessions")
+def list_parking_sessions():
+    return billing.list_active_sessions()
+
+
+@app.post("/billing/sessions/{session_id}/close")
+def close_parking_session(session_id: int, body: CloseParkingSessionRequest = CloseParkingSessionRequest()):
+    ended = None
+    if body.ended_at:
+        raw = body.ended_at.replace("Z", "")
+        ended = datetime.datetime.fromisoformat(raw)
+    try:
+        return billing.close_parking_session_and_invoice(session_id, ended_at=ended)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

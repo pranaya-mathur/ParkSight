@@ -1,5 +1,10 @@
+import os
+from unittest.mock import MagicMock
+
 import pytest
+
 from brain.graph import build_graph
+
 
 def test_graph_build():
     """Verifies that the LangGraph orchestrator can be compiled successfully."""
@@ -7,8 +12,81 @@ def test_graph_build():
     assert graph is not None
     assert hasattr(graph, "invoke")
 
-def test_classifier_logic():
-    """Tests the internal routing logic of the graph (mock invocation if key missing)."""
-    # This is a unit test of the classification logic
-    # In a real CI, we'd mock the LLM
-    pass
+
+def test_graph_invoke_standard_path_mocked(monkeypatch):
+    """Full graph run with ChatGroq mocked — no network or API key."""
+    mock_llm = MagicMock()
+
+    def fake_invoke(_messages):
+        r = MagicMock()
+        r.content = "Parking is clear; proceed to the nearest free slot."
+        return r
+
+    mock_llm.invoke.side_effect = fake_invoke
+    monkeypatch.setattr("brain.graph.ChatGroq", lambda **kwargs: mock_llm)
+
+    graph = build_graph()
+    result = graph.invoke(
+        {
+            "scene": {
+                "slots": [{"id": 0, "status": "free", "distance": 5.0}],
+                "hazards": [],
+            },
+            "violations": [],
+            "explanation": "",
+            "best_slot": 0,
+            "classification": "STANDARD",
+        }
+    )
+
+    assert result["classification"] == "STANDARD"
+    assert "explanation" in result and result["explanation"]
+    assert "revenue_data" in result
+    assert mock_llm.invoke.call_count >= 1
+
+
+def test_graph_invoke_urgent_path_mocked(monkeypatch):
+    """URGENT branch when hazards are present."""
+    mock_llm = MagicMock()
+
+    def fake_invoke(_messages):
+        r = MagicMock()
+        r.content = "Oil leak reported; halt traffic in zone A."
+        return r
+
+    mock_llm.invoke.side_effect = fake_invoke
+    monkeypatch.setattr("brain.graph.ChatGroq", lambda **kwargs: mock_llm)
+
+    graph = build_graph()
+    result = graph.invoke(
+        {
+            "scene": {"slots": [], "hazards": ["Oil leak"]},
+            "violations": [],
+            "explanation": "",
+            "best_slot": -1,
+            "classification": "STANDARD",
+        }
+    )
+
+    assert result["classification"] == "URGENT"
+    assert "ALERT" in result["explanation"] or "Oil leak" in result["explanation"]
+
+
+@pytest.mark.skipif(not os.getenv("GROQ_API_KEY"), reason="GROQ_API_KEY not set (live LLM smoke)")
+def test_graph_invoke_live_groq_smoke():
+    """Optional: one real Groq round-trip when key is present (run locally or in CI with secret)."""
+    graph = build_graph()
+    result = graph.invoke(
+        {
+            "scene": {
+                "slots": [{"id": 1, "status": "free", "distance": 3.0}],
+                "hazards": [],
+            },
+            "violations": [],
+            "explanation": "",
+            "best_slot": 1,
+            "classification": "STANDARD",
+        }
+    )
+    assert result.get("explanation")
+    assert result.get("revenue_data") is not None
